@@ -1,0 +1,1 @@
+function [err, errMsg, frequencyRange, repeaterShift] = repeaterBandPlan
