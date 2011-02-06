@@ -1,1 +1,0 @@
-computer name "ipconfig /all": "host name"
