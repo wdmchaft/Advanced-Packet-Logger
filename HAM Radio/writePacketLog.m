@@ -195,7 +195,7 @@ else % if (fid < 1) %test if log exists
   fclose(fid);
   % % now being performed in "processOutpostPacketMessages": faster to
   % % do once for all messages: 
-  fid = fOpen(pathNameExt, 'a');
+  fid = fopen(pathNameExt, 'a');
   %perhaps in read-only?
   if fid < 1
     %release the read-only

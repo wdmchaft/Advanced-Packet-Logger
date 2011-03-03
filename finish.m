@@ -42,6 +42,7 @@ if b
   end
 end %if b
 
+forceCloseAllFigs
 %%%%%% NOTE: the following call cannot be in a function or the breakpoints aren't recorded %%%%%%%%
 [fid, pathToINI] = findMatlabINI;
 if (fid > 0)

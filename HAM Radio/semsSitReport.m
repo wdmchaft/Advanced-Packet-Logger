@@ -1,4 +1,4 @@
-function [err, errMsg, printedName, printedNamePath, form] = semsSitReport(fid, msgFname, receivedFlag, pathDirs, printMsg, printer, outpost, h_field);
+function [err, errMsg, printedName, printedNamePath, form] = semsSitReport(fid, msgFname, receivedFlag, pathDirs, printMsg, printer, outpost, outpostNmNValues, h_field);
 
 % !PACF!
 % # SEMS SITUATION REPORT 
@@ -99,12 +99,12 @@ function [err, errMsg, printedName, printedNamePath, form] = semsSitReport(fid, 
 
 [err, errMsg, modName, form, printedName, printedNamePath, printEnable, copyList, numCopies, ...
     formField, h_field, textLine, fieldsFound, spaces, textToPrint]...
-  = startReadPACF(mfilename, receivedFlag, pathDirs, printMsg, '-old form', msgFname, fid);
+  = startReadPACF(mfilename, receivedFlag, pathDirs, printMsg, 'RIMS SITUATION REPORT', msgFname, fid);
+
+addressee = '';
+originator = '';
 
 while 1 % read & detect the field for each line of the entire message
-  % clear the print line so the line will not be altered unless the field
-  %   has an entry. 
-  printLine = 0;
   if (1 == findstrchr(textLine, '#EOF'))
     break
   end
@@ -124,28 +124,52 @@ while 1 % read & detect the field for each line of the entire message
     % if County, enter County; 
     % if OES Region, Enter OES Region. 
     form.subject = fT ;
+    fieldsFound = fieldsFound + 1;
   case {'3.','4.'} %
     form.comment = sprintf('%s%s; ', form.comment, fT);
+    fieldsFound = fieldsFound + 1;
   case '5a.' %
     % format is "[11/16/2009 07:04 PM]" & is in 12 hour format: decode & convert to 24 hour
     [err, errMsg, form.date, form.time] = dateTimeSplit(fT) ;
+    fieldsFound = fieldsFound + 1;
   case 'A.'
     form.senderMsgNum = fT ;
+    fieldsFound = fieldsFound + 1;
   case 'MsgNo'
     form.MsgNum = fT ;
+    fieldsFound = fieldsFound + 1;
   case 'C.'
     form.receiverMsgNum = fT ;
+    fieldsFound = fieldsFound + 1;
   case 'D.'
     form.sitSevere = fT ;
+    fieldsFound = fieldsFound + 1;
   case 'E.'
     form.handleOrder = fT ;
+    fieldsFound = fieldsFound + 1;
   case 'F.'
     form.replyReq = fT; 
+    fieldsFound = fieldsFound + 1;
   case 'replyby'
     form.replyWhen = fT ;
+    fieldsFound = fieldsFound + 1;
   otherwise
   end
+  if printEnable
+    [err, errMsg, textToPrint, h_field, formField, moveNeeded] = fillFormField(fieldID, fieldText, formField, h_field, textToPrint, spaces, outpostNmNValues);
+  else %if printEnable
+    %not printing - exit when we've extracted all we need
+    if fieldsFound > 10
+      break
+    end
+  end % if printEnable else
+  
   textLine = fgetl(fid);
 end % while 1 % read & detect the field for each line of the entire message
 
 fcloseIfOpen(fid);
+
+if (~err & printEnable)
+  [err, errMsg, printedNamePath, printedName] = ...
+    formFooterPrint(printer, printEnable, copyList, numCopies, h_field, formField, msgFname, originator, addressee, textToPrint, outpost, receivedFlag);
+end % if (~err & printEnable)

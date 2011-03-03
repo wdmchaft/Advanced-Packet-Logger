@@ -1,6 +1,59 @@
 %doIt
+    if iscell(formCoreName)
+      if length(pacfDate)
+        dashAt = findstrchr('-', pacfDate);
+        [err, errMsg, mo] = extractTextFromCSVText(pacfDate, dashAt, 0);
+        [err, errMsg, da] = extractTextFromCSVText(pacfDate, dashAt, 1);
+        [err, errMsg, yr] = extractTextFromCSVText(pacfDate, dashAt, 2);
+        [yrmoda] = dateYrMoDaStr2Val(yr, mo, da);
+      else
+        yrmoda = 0;
+      end %if length(pacfDate) else
+      for itemp = 2:2:length(formCoreName)
+        if yrmoda < formCoreName{itemp};
+          itemp = itemp - 2;
+          break
+        end
+      end %for itemp = 2:2:length(formCoreName)
+      if formCoreName{2} == 0 & itemp > 2
+        fCoreName.jpg = formCoreName{1};
+        fCoreName.txt = formCoreName{1};
+        fCoreName.mat = formCoreName{itemp-1};
+      else
+        fCoreName = formCoreName{itemp-1};
+      end
+    end %if iscell(formCoreName)
+return
 
 
+aa = groupName([1:44]);
+aa(45) = {'24missed'};
+for itemp = 46:57
+  aa(itemp) = groupName(itemp-1);
+end
+ aa(58:60)=groupName(58:60)
+return
+
+
+%shorten the arrays of digitizePoints
+for itemp = 1:42
+  for jtemp = 1:size(pH,2)
+    for ktemp = 1:size(pH,1)
+      ppH(ktemp, jtemp, itemp) = pH(ktemp, jtemp, itemp);
+    end
+  end
+  %plotPtH                    7x2x58          6496  double array (global)
+  for ktemp = 1:size(plotPtH,1)
+    for jtemp = 1:size(plotPtH,2)
+      a_plotPtH(ktemp, jtemp, itemp) = plotPtH(ktemp, jtemp, itemp);
+    end
+    a_xOfGroup(ktemp, itemp)  = xOfGroup(ktemp, itemp); %                 7x58            3248  double array (global)
+    a_yOfGroup(ktemp, itemp)  = yOfGroup(ktemp, itemp); %                 7x58            3248  double array (global)
+  end
+end
+% xOfGroup=a_xOfGroup;
+% yOfGroup=a_yOfGroup;
+% plotPtH=a_plotPtH;
 return
 
 

@@ -934,7 +934,7 @@ for fieldNdx = 1:length(fn)
   %if this item is on the pane of interest...
   for paneNdx = 1:length(paneList)
     thisPane = char(paneList(paneNdx));
-    if findstrLen(thisPane, thisField) 
+    if findstrlen(thisPane, thisField) 
       %       if findstrchr(thisField, 'LogPrt')
       %         fprintf('\n%s %s', thisPane, thisField);
       %       end

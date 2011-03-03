@@ -74,6 +74,15 @@ else % if notPassedIn
     fPath = thisDir ;
     inThisDirFlg = 1;
     return
+  else
+    [pathstr,name,ext,versn] = fileparts(thisDir);
+    if ~length(name) & ~length(ext)
+      a = sprintf('%spathToOutpost.txt', endWithBackSlash(thisDir) );
+      [netDrive, pD, slashAt, fPath] = lcl_readPathOut(a);
+      if length(fPath)
+        return
+      end
+    end % if ~length(name) & ~length(ext)
   end
 end % if notPassedIn else
 

@@ -7,7 +7,7 @@ function [codeVersion, reply] = about_dispNghbrhdSmry_private()
 
 codeVersion = 0.000000;
 if codeVersion
-  reply = sprintf('dispNghbrhdSmry Version %.3f (Debug) created 21-Jan-2011 18:19:57.', codeVersion);
+  reply = sprintf('dispNghbrhdSmry Version %.3f (Debug) created 07-Feb-2011 20:24:03.', codeVersion);
 else % if codeVersion
-  reply = sprintf('dispNghbrhdSmry created  (Debug)21-Jan-2011 18:19:57.');
+  reply = sprintf('dispNghbrhdSmry created  (Debug)07-Feb-2011 20:24:03.');
 end % if codeVersion

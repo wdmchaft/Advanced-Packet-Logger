@@ -9,19 +9,18 @@ if nargin < 5
 end
 
 [pathstr,name,ext,versn] = fileparts(pathName);
-
-answer  = inputdlg({'File name, no extenstion (& no path) ("printerAlign_ICS213_" will be pre-pended)'},'Name for Printer Alignment', 1, {name});
+if isImage
+  prefix = 'formAlign_ICS213';
+else
+  prefix = 'printerAlign_ICS213';
+end
+answer  = inputdlg({sprintf('File name, no extenstion (& no path) ("%s_" will be pre-pended)', prefix)},'Name for Printer Alignment', 1, {name});
 if ~length(answer);
   err = 1;
   return
 end
 [p,name,ext,versn] = fileparts(answer{1});
 fname = name;
-if isImage
-  prefix = 'formAlign_ICS213';
-else
-  prefix = 'printerAlign_ICS213';
-end
 b = findstrchr(prefix, fname);
 %if default is anywhere in the user response, remove it: re-format afterwards
 if b

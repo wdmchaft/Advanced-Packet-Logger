@@ -6,8 +6,26 @@ function [err, errMsg, printEnable, copyList, numCopies, formField, h_field] = r
 %   0 sent message 'outTray_copies.txt'
 %   1 received message 'inTray_copies.txt'
 %   2 received message, simple & is delivery receipt 'inTray_DelvrRecp.txt'
-% if nargin >4, will open jpg for PacFORM... unless first character of <formCoreName> is -
+% if nargin >4, will open jpg for PacFORM... unless first character of <formCoreName.image> is -
 %   The - indicates jpg is not available and PacF will be opened in browser.
+% pathDirs.addOns
+% pathDirs.DirPF
+% pathDirs.addOnsPrgms
+% 
+% formCoreName.
+% The revision of the 3 pieces of a PACF may not be the same.  For example, prior
+%    to 2-26-11, 'Resource Request #9A' PACF skipped field 24, instead reporting
+%    field 25's data as '24' and shift all the remaining fields in the same manner.
+%    Therefore we need two different .mat files: prior to 2-26 we need to remap the
+%    reported PACF data (which means the form's field 24 is blank) & after no remapping.
+% formCoreName.image: name of the background image to load (no extension: uses .jpg)
+% formCoreName.align: name of the calibration/alignment file. Uses .txt
+%                for on screen/autoprint form, this code pre-pends "formAlign"
+%                for pre-printed paper form, this code pre-pends "paperAlign"
+% formCoreName.mat: name of the file containing the digitized locations of the fields
+%           on the form as well as the names of the fields defined by PACF
+%  In all 3 cases a multi-page form will append '_pgN' after the name & since extensions
+%     are not passed in, no problem there!
 %OUTPUT:
 % formField(pageNumber, fieldIndex): structure
 % h_field(pageNumber, handleIndex): handles to the fields 1:1 correspondence between handleIndex & fieldIndex
@@ -64,7 +82,7 @@ if printEnable
   fprintf('\n printEnable = %i', printEnable);
   if (nargin > 4)
     %patch for forms that cannot auto-print: bring 'em up in browser
-    if strcmp('-', formCoreName(1:1))
+    if strcmp('-', formCoreName.image(1:1))
       [err, errMsg] = viewToPrintPACF(pathDirs.DirPF, pathDirs.addOnsPrgms, fname);
       printEnable = 0;
       return
@@ -80,25 +98,26 @@ if printEnable
     %   image file for the display or blank-paper printing: <formCoreName>.jpg
     %      single page form    <formCoreName>.jpg
     %      multiple page form  <formCoreName><_pg#>.jpg  where a separate .jpg exists for each page
-    if (printEnable > 1)
-      formName = strcat('formAlign_', formCoreName);
-    else % if (printEnable > 1)
-      formName = strcat('printerAlign_', formCoreName);
-    end % if (printEnable > 1) else
     
+    if (printEnable > 1)
+      calName = formCoreName.formAlign;
+    else % if (printEnable > 1)
+      calName = formCoreName.printerAlign;
+    end % if (printEnable > 1) else
+
     %load the form field positions and information
-    if findstrchr('ics213', lower(formName))
-      [err, errMsg, formField, printerPort] = loadICS213FormPositions(pathDirs.addOns, formName);
+    if findstrchr('ics213', lower(calName))
+      [err, errMsg, formField, printerPort] = loadICS213FormPositions(pathDirs.addOns, calName);
       dirPgMat = [];
-      showFormPName = strcat(pathDirs.addOnsPrgms, formCoreName);
-    else % if findstrchr('ics213', lower(formName))
-      pathNameMat = sprintf('%s%s', pathDirs.addOns, formCoreName);
+      showFormPName = strcat(pathDirs.addOnsPrgms, formCoreName.image);
+    else % if findstrchr('ics213', lower(calName))
+      pathNameMat = sprintf('%s%s', pathDirs.addOns, formCoreName.mat);
       %check for a multiple page form:
       dirPgMat = dir(sprintf('%s_pg*.mat', pathNameMat));
-      calPName = sprintf('%s%s', pathDirs.addOns, formName) ;
+      calPName = sprintf('%s%s', pathDirs.addOns, calName) ;
       if ~length(dirPgMat)
         [err, errMsg, formField] = loadAlignFormPosition(pathNameMat, calPName);
-        showFormPName = strcat(pathDirs.addOnsPrgms, formCoreName);
+        showFormPName = strcat(pathDirs.addOnsPrgms, formCoreName.image);
       else %if ~length(dirPgMat)
         %load each page: formField goes from a one dimension array and becomes two dimensioned (:) -> formField(:, pg)
         for pageNdx = 1:length(dirPgMat)
@@ -109,11 +128,29 @@ if printEnable
           pgTxt = thisMat(findstrchr('_pg',thisMat):length(thisMat));
           %build the name for this page...
           pathNameMat = sprintf('%s%s', pathDirs.addOns, thisMat);
-          calPName = sprintf('%s%s%s', pathDirs.addOns, formName, pgTxt) ;
-          showFormPName(pageNdx) = {sprintf('%s%s%s', pathDirs.addOnsPrgms, formCoreName, pgTxt)};
+          calPName = sprintf('%s%s%s', pathDirs.addOns, calName, pgTxt) ;
+          showFormPName(pageNdx) = {sprintf('%s%s%s', pathDirs.addOnsPrgms, formCoreName.image, pgTxt)};
           %load the page fields and alignment
           [err, errMsg, ff] = loadAlignFormPosition(pathNameMat, calPName);
           if pageNdx > 1
+            %check if the same length between the existing and the new
+            %  if existing is smaller
+            if size(formField, 2) < size(ff, 2)
+              for itemp = size(formField, 2)+1:size(ff, 2)
+                for pgNdx = 1:size(formField, 1)
+                  formField(pgNdx, itemp).digitizedName = '' ;
+                  formField(pgNdx, itemp).PACFormTagPrimary = '' ;
+                  formField(pgNdx, itemp).PACFormTagSecondary = '' ;
+                end % for pgNdx = 1:size(formField, 1)
+              end % for itemp = size(formField, 2)+1:size(ff, 2)
+            elseif size(formField, 2) > size(ff, 2)
+              %if new is smaller
+              for itemp = size(ff, 2)+1:size(formField, 2)
+                ff(itemp).digitizedName = '' ;
+                ff(pgNdx, itemp).PACFormTagPrimary = '' ;
+                ff(pgNdx, itemp).PACFormTagSecondary = '' ;
+              end % for itemp = size(formField, 2)+1:size(ff, 2)
+            end
             %include the load into the array
             formField(pageNdx, 1:length(ff)) = ff;
           else
@@ -121,7 +158,7 @@ if printEnable
           end
         end % for pageNdx = 1:length(a)
       end % if ~length(dirPgMat) else
-    end % if findstrchr('ics213', lower(formName)) else
+    end % if findstrchr('ics213', lower(calName)) else
     if err
       errMsg = sprintf('>%s', mfilename, errMsg);
       fprintf('\n*** %s', errMsg);
@@ -164,7 +201,7 @@ if printEnable
             end % for itemp = 1:length(footerNdx)
           end % if length(footerNdx)
         else
-          fprintf('\n******* h_field short! %s ', strcat(pathDirs.addOnsPrgms, formCoreName));
+          fprintf('\n******* h_field short! %s ', strcat(pathDirs.addOnsPrgms, formCoreName.mat));
         end
         if pageNdx > 1
           %include the load into the array
@@ -193,7 +230,7 @@ if printEnable
         fprintf('\n******* error: %s', errMsg);
       end
       if (length(h_field) < 2) 
-        fprintf('\n******* h_field short! %s ', strcat(pathDirs.addOnsPrgms, formCoreName));
+        fprintf('\n******* h_field short! Simple message ');
       end
     end %if (printEnable > 1)
   end % if (nargin > 4) else

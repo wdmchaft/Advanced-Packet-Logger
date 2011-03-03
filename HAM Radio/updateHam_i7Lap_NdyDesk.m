@@ -7,16 +7,16 @@ listItem.prompt = 'i7 Laptop';
 listItem.rootPath =   'c:\';
 listItem.mFiles = 'mfiles\';
 listItem.PDA = 'C:\Users\Owner\Documents\Documents on arose''s Smartphone\Documents';
-%listItem.scripts = 'Program Files (x86)\Outpost\scripts';
-%listItem.addOns = 'Program Files (x86)\Outpost\AddOns';
-listItem.scripts = 'SCCo Packet\scripts';
-listItem.addOns = 'SCCo Packet\AddOns';
+[err, errMsg, presentDrive, fPath, inThisDirFlg] = findOutpostINI(listItem.rootPath);
+listItem.scripts = strcat(fPath, 'scripts');
+listItem.addOns =  strcat(fPath, 'AddOns');
 
 itemp = 2;
 listItem(itemp).prompt = 'Andy''s desktop';
 listItem(itemp).rootPath =   '\\arose_h\';
 listItem(itemp).mFiles = 'f\mfiles\';
 listItem(itemp).PDA = '\\AROSE_H\c$\Documents and Settings\arose\My Documents\WINDOWSMOBILE4 My Documents\Documents';
+% % [err, errMsg, presentDrive, fPath, inThisDirFlg] = findOutpostINI(strcat(listItem.rootPath, 'c$\'));
 listItem(itemp).scripts = 'f\Program Files\Outpost\scripts';
 listItem(itemp).addOns =  'f\Program Files\Outpost\AddOns';
 

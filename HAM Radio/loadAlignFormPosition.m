@@ -27,11 +27,11 @@ if nargin < 3
   key.right = 'AlignmentBox'; 
   key.top = 'AlignmentBox';
   key.bot = 'AlignmentBox';
-  %indices to points of interest after sorting the X data or Y data
-  key.left_posNdx = [1 2];
-  key.right_posNdx = [3 4];
-  key.top_posNdx = [1 2]; %top of the box
-  key.bot_posNdx = [3 4];
+  %   %indices to points of interest after sorting the X data or Y data
+  %   key.left_posNdx = [1 2];
+  %   key.right_posNdx = [3 4];
+  %   key.top_posNdx = [1 2]; %top of the box
+  %   key.bot_posNdx = [3 4];
 end
 err = 0;
 %make sure the file exists.
@@ -73,10 +73,10 @@ printerPort = '';
 % ********************** CALIBRATION **********************  % % %
 
 %get the digitized data (in pixels)
-[LeftBorder, err, errMsg] = getAvgEdge(key.left, key.left_posNdx, groupName, xOfGroup);
-[RightBorder, err, errMsg] = getAvgEdge(key.right, key.right_posNdx, groupName, xOfGroup);
-[formTopRef, err, errMsg] = getAvgEdge(key.top, key.top_posNdx, groupName, yOfGroup);
-[formBottomRef, err, errMsg] = getAvgEdge(key.bot, key.bot_posNdx, groupName, yOfGroup);
+[LeftBorder, err, errMsg] = getAvgEdge(key.left, 0, groupName, xOfGroup);
+[RightBorder, err, errMsg] = getAvgEdge(key.right, 1, groupName, xOfGroup);
+[formTopRef, err, errMsg] = getAvgEdge(key.top, 0, groupName, yOfGroup);
+[formBottomRef, err, errMsg] = getAvgEdge(key.bot, 1, groupName, yOfGroup);
 
 %for any X: express as % l-r & then convert
 % Xfraction = (Xdigitize - LeftBorder) / X_range
@@ -167,7 +167,7 @@ end % if (fid > 0) else
 % end
 
 %----------------------------------------------------------------------
-function [val, err, errMsg] = getAvgEdge(text, pts, groupName, xOfGroup)
+function [val, err, errMsg] = getAvgEdge(text, minMAX, groupName, coordOfGroup)
 leftGrpNdx = find(ismember(groupName, text));
 if ~length(leftGrpNdx)
   err = 1;
@@ -178,38 +178,65 @@ else
   err = 0;
   errMsg = '';
 end
-%We digitized this as a box & not merely a diagonal
-%5 points to close the box but only 4 unique
-xSet = xOfGroup(1:4, leftGrpNdx);
-%left & right references
-a = sort(xSet);
+
+Ndx = 1:size(coordOfGroup,1);
+newNdx = [];
+%need two points to define the edge
+while length(newNdx) < 2
+  if minMAX
+    a = max(coordOfGroup(Ndx, leftGrpNdx));
+  else
+    a = min(coordOfGroup(Ndx, leftGrpNdx));
+  end
+  aa = find(a==coordOfGroup(Ndx, leftGrpNdx));
+  %remove the indice(s) that contain the min/max
+  %  from the next search
+  for itemp =1:length(aa)
+    Ndx = Ndx(find(Ndx ~= aa(itemp)));
+  end
+  newNdx = [newNdx aa'];
+end
+% only want two points but may have found 3 because the code closes
+%   the area.
+newNdx = sort(newNdx);
+if length(newNdx) > 2
+  newNdx = newNdx([1:2]);
+end
 val = 0;
-for itemp = 1:length(pts)
-  val = val + a(pts(itemp));
+for itemp = 1:length(newNdx)
+  val = val + coordOfGroup(newNdx(itemp), leftGrpNdx);
 end
 val = val/itemp;
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function [left, top, rght, btm] = cnrvtDigtzToLocation(xGroup, yGroup, ptsGroup)
 global Col_leftBorder LeftBorder X_range Col_fullScale Yzero Y_range Row_top Row_fullScale
 
-Ndx = 1:min(4,ptsGroup);
-if ptsGroup == 2
-  left = min(xGroup(Ndx));
-  rght = max(xGroup(Ndx));
-  top = min(yGroup(Ndx));
-  btm = max(yGroup(Ndx));
-else
-  if ptsGroup <= 5
-    a = sort(xGroup(Ndx));
-    left = (a(1) + a(2))/2;
-    rght = (a(3) + a(4))/2;
-    a = sort(yGroup(Ndx));
-    top = (a(1) + a(2))/2;
-    btm = (a(3) + a(4))/2;
-  end
-end 
-left = Col_leftBorder + (left - LeftBorder) / X_range * Col_fullScale;
-rght = Col_leftBorder + (rght - LeftBorder) / X_range * Col_fullScale;
-top = Row_top + (top - Yzero) / Y_range * Row_fullScale;
-btm = Row_top + (btm - Yzero) / Y_range * Row_fullScale;
+if ~ptsGroup
+  left = 0;
+  top = 0;
+  rght = 0;
+  btm = 0;
+else %if ~ptsGroup
+  Ndx = 1:min(4,ptsGroup);
+  if ptsGroup == 2
+    left = min(xGroup(Ndx));
+    rght = max(xGroup(Ndx));
+    top = min(yGroup(Ndx));
+    btm = max(yGroup(Ndx));
+  else
+    if ptsGroup <= 5
+      a = sort(xGroup(Ndx));
+      left = (a(1) + a(2))/2;
+      rght = (a(3) + a(4))/2;
+      a = sort(yGroup(Ndx));
+      top = (a(1) + a(2))/2;
+      btm = (a(3) + a(4))/2;
+    end
+  end 
+  left = Col_leftBorder + (left - LeftBorder) / X_range * Col_fullScale;
+  rght = Col_leftBorder + (rght - LeftBorder) / X_range * Col_fullScale;
+  top = Row_top + (top - Yzero) / Y_range * Row_fullScale;
+  btm = Row_top + (btm - Yzero) / Y_range * Row_fullScale;
+end %if ~ptsGroup else
 %----------------------------------------------------------------------

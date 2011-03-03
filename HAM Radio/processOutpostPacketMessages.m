@@ -310,8 +310,30 @@ end
 dos(sprintf('attrib "%s" -r', sprintf('%s*.csv', masterLogPathName)));
 %exception handler so a) code continues & b) we restore read-only
 try
+  %set some values so if the called function triggers the try/catch we'll have values
+  add_sentTrayList = {};
+  add_inTrayList = {};
+  logUpdated = 0;
   [add_sentTrayList, add_inTrayList, err, errMsg, logUpdated] = processMessages(file_new, {PathSent PathReceived}, [], 0, pathDirs, outpostNmNValues, packetLogName, incidentName, printer, logPaths, masterLogPathName);
 catch
+  if length(errMsg)
+    errMsg = sprintf('%s AND %s', errMsg, lasterr);
+  else
+    %set error so findNewOutpostMsgs, called from Script, knows & reacts properly on next set
+    err = 1;
+    errMsg =lasterr;
+  end
+  %only care date_time, Yr, Mo, Da
+  [err_1, errMsg_1, date_time, prettyDateTime, Yr, Mo, Da] = datevec2timeStamp(now);
+  a = findstrchr('_', date_time);
+  fid = fopen(sprintf('%s%s_%s.log', outpostValByName('DirAddOnsPrgms', outpostNmNValues), mfilename, date_time(1:a-1)),'a');
+  if fid > 0
+    %to file
+    fprintf(fid, '\r\n%s error: %s ', date_time, errMsg);
+    %to screen
+    fprintf('\n%s error: %s', date_time, errMsg);
+    fclose(fid);
+  end
 end
 dos(sprintf('attrib "%s" +r', sprintf('%s*.csv', masterLogPathName)));
 if err
@@ -464,6 +486,8 @@ bbsMsgKey = 'Message';
 
 %compare the latest dir of files with the stored list to see if any are new
 for filesNdx = 1:length(fileList)
+  msgTypeLcl = [];
+
   %initialize values for the log
   outpost.bbs = '';
   outpost.from = '';
@@ -605,7 +629,8 @@ for filesNdx = 1:length(fileList)
     %of the new information in the heading detection loop.  When the Subject line is found &
     %breaks us out of the heading search loop, we'll quit attempting to load these two new fields.
     
-    while ((found < (31+32*msg)) & ~feof(fid))
+    lclMsgID_findEnable = 32*msg;
+    while ((found < (31+lclMsgID_findEnable)) & ~feof(fid))
       textLine = fgetl(fid);
       linesRead = linesRead + 1;
       tl = lower(textLine);
@@ -624,8 +649,10 @@ for filesNdx = 1:length(fileList)
         c = findstrchr(bbsMsgKey, textLine);
         a = findstrchr('Local_Msg_ID:', textLine);
         if a | c
-          misNdx(msgTypeLcl) = 0;
-          found = found + 32; %may not have local # even if .mss file
+          if length(msgTypeLcl)
+            misNdx(msgTypeLcl) = 0;
+          end
+          found = found + lclMsgID_findEnable; %may not have local # even if .mss file
           if a
             outpost.logMsgNum = strtrim(strrep(pullAfterColon(textLine),'_',' '));
             fpPosition = ftell(fid);
@@ -754,13 +781,13 @@ for filesNdx = 1:length(fileList)
       case 8 %-- 'OES MISSION REQUEST',  ...  strcmp
         [err, errMsg, printedName, printedNamePath, form] = oesMissionRequest(fid, fpathName, receivedFlag, pathDirs, printMsg, printer);
       case 9 %-- 'SEMS SITUATION'
-        [err, errMsg, printedName, printedNamePath, form] = semsSitReport(fid, fpathName, receivedFlag, pathDirs, printMsg, printer);
+        [err, errMsg, printedName, printedNamePath, form] = semsSitReport(fid, fpathName, receivedFlag, pathDirs, printMsg, printer, outpost, outpostNmNValues);
       case 10 %-- FORM DOC-9 HOSPITAL-STATUS REPORT  (see also #6 which is the previous version of this PacFORM)
         [err, errMsg, printedName, printedNamePath, form] = doc9HospitalStatusReport(fid, fpathName, receivedFlag, pathDirs, printMsg, printer, outpost);
       case 11 % RESOURCE REQUEST FORM #9A
         [err, errMsg, printedName, printedNamePath, form] = resourceRequestForm9A(fid, fpathName, receivedFlag, pathDirs, printMsg, printer);
       case 12 %-- 'FORM DOC-9 BEDS HOSPITAL-STATUS REPORT'
-        [err, errMsg, printedName, printedNamePath, form] = doc9bedsHospitalStatusReport(fid, fpathName, receivedFlag, pathDirs, printMsg, printer);
+        [err, errMsg, printedName, printedNamePath, form] = doc9bedsHospitalStatusReport(fid, fpathName, receivedFlag, pathDirs, printMsg, printer, outpost, outpostNmNValues);
       otherwise
         %form not in recognized list.  We'll log it even though we don;t know how to extract information from it
         err = 0;

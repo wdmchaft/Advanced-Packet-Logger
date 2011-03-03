@@ -7,7 +7,7 @@ function [codeVersion, reply] = about_processOutpostPacketMessa()
 
 codeVersion = 0.000000;
 if codeVersion
-  reply = sprintf('processOutpostPacketMessages Version %.3f (Debug) created 21-Jan-2011 16:45:25.', codeVersion);
+  reply = sprintf('processOutpostPacketMessages Version %.3f (Debug) created 27-Feb-2011 12:44:57.', codeVersion);
 else % if codeVersion
-  reply = sprintf('processOutpostPacketMessages created  (Debug)21-Jan-2011 16:45:25.');
+  reply = sprintf('processOutpostPacketMessages created  (Debug)27-Feb-2011 12:44:57.');
 end % if codeVersion

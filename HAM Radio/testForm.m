@@ -65,6 +65,7 @@ printMsg = printEnable;
 
 pathDirs.addOns = pathAddOns;
 pathDirs.addOnsPrgms = pathPrgms;
+pathDirs.DirPF = outpostValByName('DirPF', outpostNmNValues);
 fprintf('\n''%s''', fpathName);
 edit(fpathName)
 fprintf('\nOpening: %s', fpathName);
@@ -110,13 +111,13 @@ else % if ~PACF
   case 8 % 'OES MISSION REQUEST',  ...  strcmp
     [err, errMsg, printedName, printedNamePath, form] = oesMissionRequest(fid, fpathName, receivedFlag, pathDirs, printMsg, printer, outpost);
   case 9 % 'SEMS SITUATION'
-    [err, errMsg, printedName, printedNamePath, form] = semsSitReport(fid, fpathName, receivedFlag, pathDirs, printMsg, printer, outpost);
+    [err, errMsg, printedName, printedNamePath, form] = semsSitReport(fid, fpathName, receivedFlag, pathDirs, printMsg, printer, outpost, outpostNmNValues);
   case 10 % FORM DOC-9 HOSPITAL-STATUS REPORT  (see also #6 which is the previous version of this PacFORM)
     [err, errMsg, printedName, printedNamePath, form] = doc9HospitalStatusReport(fid, fpathName, receivedFlag, pathDirs, printMsg, printer, outpost);
   case 11 % RESOURCE REQUEST FORM #9A
-    [err, errMsg, printedName, printedNamePath, form] = resourceRequestForm9A(fid, fpathName, receivedFlag, pathDirs, printMsg, printer, outpost);
+    [err, errMsg, printedName, printedNamePath, form] = resourceRequestForm9A(fid, fpathName, receivedFlag, pathDirs, printMsg, printer, outpost, outpostNmNValues);
   case 12 % 'FORM DOC-9 BEDS HOSPITAL-STATUS REPORT'
-    [err, errMsg, printedName, printedNamePath, form] = doc9bedsHospitalStatusReport(fid, fpathName, receivedFlag, pathDirs, printMsg, printer, outpost);
+    [err, errMsg, printedName, printedNamePath, form] = doc9bedsHospitalStatusReport(fid, fpathName, receivedFlag, pathDirs, printMsg, printer, outpost, outpostNmNValues);
   otherwise
     %form not in recognized list.  We'll log it even though we don;t know how to extract information from it
     err = 0;

@@ -16,7 +16,7 @@ else
   [pathstr,name,ext,versn] = fileparts(thisCore);
   fromPathName = sprintf('%s%s.exe', endWithBackSlash(targetDir), name) ;
   [err, errMsg, outpostNmNValues] = OutpostINItoScript; 
-  if findstrLen('OutpostINItoScript', thisCore)
+  if findstrlen('OutpostINItoScript', thisCore)
     toPath = outpostValByName('DirOutpost', outpostNmNValues);
   else
     toPath = outpostValByName('DirAddOnsPrgms', outpostNmNValues);

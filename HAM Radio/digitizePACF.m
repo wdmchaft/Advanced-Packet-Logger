@@ -112,6 +112,8 @@ function [err, errMsg] = digitizePACF(pacfTxtDir);
 %  (or printed) field - a check mark is not subsituted.
 
 %Set the Rules for what contents indicate a check box
+%  also, form-specific rules will be loaded from a file 'digitizePACF_<form name>.txt'
+%   where <form name> is returned by "getPACFType".  ex: 'digitizePACF_SEMS SITUATION.txt'
 checkBoxContents = {...
     {'yes','no'};...
     {'emergency','urgent','other'};...
@@ -122,10 +124,12 @@ checkBoxContents = {...
     };
 %    {'checked'};...  <- this is not a good indicator because this is only the content when the checkbox is checked!
 %             Therefore run-time determination in fillFormField that this content indicates a checkbox
-%             Not the best since the visibile off cannot be implemented
+%             Not the best since the visible off cannot be implemented
+
+checkBoxFieldKey(1:size(checkBoxContents,1)) ={''};
 
 if nargin < 1
-  pacfTxtDir = 'C:\Program Files (x86)\Outpost\archive\TestFiles';
+  pacfTxtDir = 'C:\ProgramData\SCCo Packet\archive\TestFiles';
 end
 
 %list of all formats supported by "imread"
@@ -163,6 +167,7 @@ if (fid < 1)
 end
 %learn all the fields:
 groupNameInNdx = 0;
+groupNameIn = {};
 PACF = detectPacFORM(fid, 0, 1e3);
 if ~PACF
   fprintf('\nNot recognized as a PACF "%s".', pathNName);
@@ -176,6 +181,37 @@ if err
   fcloseIfOpen(fid);
   return
 end
+%text if there is an auxiliary information file with form-specific rules
+%  each line that starts with % is ignored
+%  each active line is a CSV with the first item the field number.... used to filter
+%    the field contents so if they happen to occur in another field, that
+%    field is not expanded/altered to be check boxes.  The rest of the line 
+%    are the field contents as they would be loaded by PACF.
+%   ex:  1.,City, Operational Area, OES Region, OES Headquarters
+auxFile = sprintf('%s_%s.txt', mfilename, thisForm);
+fid_aux = fopen(auxFile, 'r');
+%we have a file?
+if fid_aux > 0
+  fieldKey = {};
+  while ~feof(fid_aux)
+    textLine = fgetl(fid_aux);
+    if 1 ~= findstrchr('%', strtrim(textLine))
+      txt = {};
+      commasAt = findstrchr(',', textLine);
+      [err, errMsg, text] = extractTextFromCSVText(textLine, commasAt, 0);
+      fieldKey(length(fieldKey)+1) = {lower(strtrim(text))};
+      %extract the information from the line
+      for itemp = 1:length(commasAt)
+        [err, errMsg, text] = extractTextFromCSVText(textLine, commasAt, itemp );
+        txt(length(txt) + 1) = {lower(strtrim(text))};
+      end % for itemp = 1:length(commasAt)
+      %add to the rules list.
+      checkBoxContents{size(checkBoxContents,1)+1,:} = txt ;
+      checkBoxFieldKey(size(checkBoxContents,1)) = fieldKey(length(fieldKey));
+    end % if ~findstrchr('%', textLine)
+  end %while ~feof(fid_aux)
+  fcloseIfOpen(fid_aux);
+end %if fid_aux
 %get past the PACF header
 % skip through the comment/heading
 textLine = '#' ;
@@ -208,49 +244,27 @@ while 1 % read & detect the field for each line of the entire message
     %determine if this is a field using check box(es) - we've got rules
     %  of what types of field CONTENTS indicate check boxes
     %"otherwise" => not a check box type of field
-    if 1
-      %using the checkBoxContents list
-      found = 0;
-      lwr = lower(fieldText);
-      for itemp = 1:size(checkBoxContents,1)
-        if any(ismember(checkBoxContents{itemp,:}, lwr))
+    %using the checkBoxContents list
+    found = 0;
+    lwr = lower(fieldText);
+    for itemp = 1:size(checkBoxContents,1)
+      if any(ismember(checkBoxContents{itemp,:}, lwr))
+        if length(checkBoxFieldKey{itemp})
+          found = strcmp(fieldID, checkBoxFieldKey{itemp});
+        else % if length(checkBoxFieldKey{itemp})
           found = 1;
-          break
-        end
-      end
-      if found
-        % create a field name for all of the elements in that set.
-        %   Each will start with the fieldID followed by a "_" and then the element name.        
-        [groupNameIn, groupNameInNdx] = extendChoices(fieldIDNoPeriod, checkBoxContents{itemp,:}, groupNameIn, groupNameInNdx);
-      else
-        %field content not found in the check box "rules" - must be a text box
-        groupNameInNdx = groupNameInNdx + 1;
-        groupNameIn(groupNameInNdx) = {fieldID};
-      end
-    else % if 1
-      %not using the checkBoxContents list but the switch/case technique
-      switch lower(fieldText)
-      case {'yes','no'}
-        subNameList = {'yes','no'};
-      case {'emergency','urgent','other'}
-        subNameList = {'emergency','urgent','other'} ;
-      case {'immediate','priority','routine'}
-        subNameList = {'immediate','priority','routine'} ;
-      case {'checked'}
-        subNameList = {'checked'} ;
-      case 'method' %communication method for message;  Used on ICS 213
-        subNameList = {'Telephone','Dispatch Center','EOC Radio','FAX','Courier','Amateur Radio','Amateur Radio','Other'} ;
-      case {'Received','Sent'}
-        subNameList = {'Received','Sent'} ;
-      otherwise
-        groupNameInNdx = groupNameInNdx + 1;
-        groupNameIn(groupNameInNdx) = {fieldID};
-        subNameList = '';
-      end %if 1
-      if length(subNameList)
-        [groupNameIn, groupNameInNdx] = extendChoices(fieldIDNoPeriod, subNameList, groupNameIn, groupNameInNdx);
-      else
-      end
+        end % % if length(checkBoxFieldKey{itemp}) else
+        break
+      end % if any(ismember(checkBoxContents{itemp,:}, lwr))
+    end % for itemp = 1:size(checkBoxContents,1)
+    if found
+      % create a field name for all of the elements in that set.
+      %   Each will start with the fieldID followed by a "_" and then the element name.        
+      [groupNameIn, groupNameInNdx] = extendChoices(fieldIDNoPeriod, checkBoxContents{itemp,:}, groupNameIn, groupNameInNdx);
+    else
+      %field content not found in the check box "rules" - must be a text box
+      groupNameInNdx = groupNameInNdx + 1;
+      groupNameIn(groupNameInNdx) = {fieldID};
     end
   end
   textLine = fgetl(fid);
@@ -259,6 +273,7 @@ end %while 1
 fcloseIfOpen(fid);
 
 %add housekeeping fields
+lastNonhouseNdx = groupNameInNdx;
 houseKeeping = {'AlignmentBox','Footer','Header','end-no points (hit OK & then "q")'};
 for itemp = 1:length(houseKeeping)
   groupNameInNdx = groupNameInNdx + 1;
@@ -276,6 +291,55 @@ if err
   fprintf('\nErr: %s', errMsg);
   return
 end
+
+button = questdlg('Is this part of a multiple-page form?',...
+  'Multiple Page Form','Yes','No','Yes');
+if strcmp(button, 'Yes') 
+  listIn = {};
+  for itemp = 1:lastNonhouseNdx
+    listIn(itemp) = groupNameIn(itemp);
+  end
+  choice = userChoice(listIn, 'First group on this page of the form', 1);
+  if choice < 1
+    fprintf('\r\nUser canceled!');
+    return
+  end
+  firstGroupNdx = choice;
+  choice = userChoice(listIn, 'Last group on this page of the form', firstGroupNdx+1);
+  if choice < 1
+    fprintf('\r\nUser canceled!');
+    return
+  end
+  lastGroupNdx = choice;
+  thisPageNdx = firstGroupNdx:lastGroupNdx;
+  while strcmp(button, 'Yes')
+    thisList = groupNameIn(thisPageNdx);
+    fprintf('\nThe following fields are on this page:');
+    for itemp = 1:length(thisList)
+      fprintf('\n%s', thisList{itemp});
+    end
+    button = questdlg('Do you want to add more fields?',...
+      'Add fields','Yes','No','Yes');
+    if strcmp(button, 'Yes')
+      listIn = {};
+      for itemp = 1:lastNonhouseNdx
+        if ~find(itemp) == thisList
+          listIn(itemp) = groupNameIn(itemp);
+        end
+      end
+      choice = userChoice(listIn, 'Additional group on this page', 1);
+      if choice < 1
+        fprintf('\r\nUser canceled!');
+        return
+      end
+      thisList(length(thisList)+1) = choice;
+    end % if strcmp(button, 'Yes')
+  end %while strcmp(button, 'Yes')
+  %number of house keeping added
+  a = groupNameInNdx - lastNonhouseNdx;
+  thisList(length(thisList)+[1:a]) = groupNameIn(lastNonhouseNdx + [1:a]);
+  groupNameIn = thisList;
+end % if strcmp(button, 'Yes') part of multipage form
 
 %finally digitize by prompting for each of the fields we've found
 keyMOUSEpress = -2; %cell array "groupName" has been loaded but nothing else

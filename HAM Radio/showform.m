@@ -14,6 +14,8 @@ function varargout = showForm(varargin)
 %  [err, errMsg, h_field, formField, figPosition] = showForm(fPathNameExt, pathAddOns, formField[, figPosition])
 %              h_field(length(h_field)) == figure1
 %INPUTS:
+%If all 3 inputs are empty strings (= ''), this function will create a form for a Simple message:
+%    ie: nothing is loaded, no external files used.
 %  fPathNameExt: path and name with or without extension of image file
 %    if multiple page form, this will be a cell of strings with each element being
 %     a page and the corresponding fields being accessed via the 2nd dimension of formField
@@ -41,6 +43,12 @@ elseif ischar(varargin{1}) % INVOKE NAMED SUBFUNCTION OR CALLBACK
   catch
     err = 1;
   end %try
+  if findstrchr('Invalid function name', lasterr)
+    try
+      [err, errMsg, h_field, formField, figPosition] = showForm_OpeningFcn(varargin{:});
+    catch
+    end
+  end
   %This "if" provides a method of passing parameters to "showForm_OpeningFcn".  It responds
   %  when the program has been called but not in response to a user activity on the GUI.
   if err
@@ -233,6 +241,9 @@ if length(fPathNameExt)
     varargout{2} = errMsg;
     varargout{3} = handles.figure1;
     varargout{4} = 0;
+    if nargout > 4
+      varargout{5} = 0;
+    end
     return
   end
   fclose(fid);
@@ -315,30 +326,30 @@ for fldNdx =1:length(field)
   %   if strcmp('B',char(field(fldNdx).digitizedName))
   %     fprintf('asdjlasd');
   %   end
-  if ~findstrLen('_box',lower(char(field(fldNdx).digitizedName)))
-    if findstrLen('Message_12_line', char(field(fldNdx).digitizedName))
+  if ~findstrlen('_box',lower(char(field(fldNdx).digitizedName)))
+    if findstrlen('Message_12_line', char(field(fldNdx).digitizedName))
       %only create the text box once
-      if findstrLen('Message_12_line_1', char(field(fldNdx).digitizedName))
+      if findstrlen('Message_12_line_1', char(field(fldNdx).digitizedName))
         lftBotWidHi = multiLineToOne(field, '12');
-      else % if findstrLen('Message_12_line_1', char(field(fldNdx).digitizedName))
+      else % if findstrlen('Message_12_line_1', char(field(fldNdx).digitizedName))
         % not the first line - one of the repeats
         lftBotWidHi(1) = -1; %disable
-      end % if findstrLen('Message_12_line_1', char(field(fldNdx).digitizedName)) else
-    elseif findstrLen('ActionTaken_13_line', char(field(fldNdx).digitizedName))
+      end % if findstrlen('Message_12_line_1', char(field(fldNdx).digitizedName)) else
+    elseif findstrlen('ActionTaken_13_line', char(field(fldNdx).digitizedName))
       %only create the text box once
-      if findstrLen('ActionTaken_13_line_1', char(field(fldNdx).digitizedName))
+      if findstrlen('ActionTaken_13_line_1', char(field(fldNdx).digitizedName))
         lftBotWidHi = multiLineToOne(field, '13');
-      else % if findstrLen('ActionTaken_13_line_1', char(field(fldNdx).digitizedName))
+      else % if findstrlen('ActionTaken_13_line_1', char(field(fldNdx).digitizedName))
         % not the first line - one of the repeats
         lftBotWidHi(1) = -1; %disable
-      end % if findstrLen('ActionTaken_13_line_1', char(field(fldNdx).digitizedName)) else
-    else %elseif findstrLen('ActionTaken_13_line', char(field(fldNdx).digitizedName))
+      end % if findstrlen('ActionTaken_13_line_1', char(field(fldNdx).digitizedName)) else
+    else %elseif findstrlen('ActionTaken_13_line', char(field(fldNdx).digitizedName))
       % Not a multiple line area.
       lftBotWidHi(1) = field(fldNdx).lftTopRhtBtm(1);
       lftBotWidHi(2) = (1-field(fldNdx).lftTopRhtBtm(4));
       lftBotWidHi(3) = (field(fldNdx).lftTopRhtBtm(3) - field(fldNdx).lftTopRhtBtm(1)) ;
       lftBotWidHi(4) = abs(field(fldNdx).lftTopRhtBtm(2) - field(fldNdx).lftTopRhtBtm(4)) ;
-    end %if findstrLen('Message_12_line', char(field(fldNdx).digitizedName))
+    end %if findstrlen('Message_12_line', char(field(fldNdx).digitizedName))
     if ~(lftBotWidHi(1) < 0) %if not disabled...
       ud.fieldDigName = field(fldNdx).digitizedName;
       %create a text box
@@ -359,7 +370,11 @@ for fldNdx =1:length(field)
           set(h_field(fldNdx),'FontWeight','Bold', 'String','','Visible','off');
         end
       end %if ~length(field(fldNdx).PACFormTagSecondary) else
-      set(h_field(fldNdx),'position', lftBotWidHi)
+      try
+        set(h_field(fldNdx),'position', lftBotWidHi)
+      catch
+        fprintf('\nerror in %s/fieldsOnForm at "set(h_field(fldNdx),''position'', lftBotWidHi)"', mfilename);
+      end
       if debugFlag
       else %if debugFlag
         %set color to white, the background of all forms

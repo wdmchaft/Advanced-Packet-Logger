@@ -11,8 +11,8 @@ figure1 = 0 ;
 callback = 0;
 if nargin == 0  % LAUNCH GUI
   [err, errMsg, figure1] = figImageAlign_OpeningFcn;
-elseif nargin < 2 % LAUNCH GUI and pass path or path\name
-  [err, errMsg, figure1] = figImageAlign_OpeningFcn(varargin{1});
+elseif nargin < 3 % LAUNCH GUI and pass path or path\name
+  [err, errMsg, figure1] = figImageAlign_OpeningFcn(varargin{:});
 elseif ischar(varargin{1}) % INVOKE NAMED SUBFUNCTION OR CALLBACK
   callback = 1;
   err = 0;
@@ -130,107 +130,114 @@ function varargout = figImageAlign_OpeningFcn(varargin)
 
 [err, errMsg, modName] = initErrModName(strcat(mfilename, '(figImageAlign_OpeningFcn)'));
 
-fig = openfig(mfilename,'reuse');
 
-% Use system color scheme for figure:
-set(fig,'Color',get(0,'defaultUicontrolBackgroundColor'));
-
-% Generate a structure of handles to pass to callbacks, and store it. 
-handles = guihandles(fig);
-guidata(fig, handles);
-
-[err, errMsg, outpostNmNValues] = OutpostINItoScript;
-handles.pathAddOns = outpostValByName('DirAddOns', outpostNmNValues);
-handles.pathPrgms = outpostValByName('DirAddOnsPrgms', outpostNmNValues);
-
-%file stored in .mat is much faster loading
-fPathName = strcat(handles.pathPrgms, 'ICS-213-SCC-Message-Form1 copy');
-
-fPathName='F:\Downloads\Ham Radio\Packet_soundcard\Computer screen shoots';
-
-fPathName = 'ICS-213-SCC-Message-Form 1';
-
-%list of all formats supported by "imread"
-a = {'*.bmp','Windows Bitmap',...
-    '*.cur','Windows Cursor resources',...
-    '*.hdf','Hierarchical Data Format',...
-    '*.ico','Windows Icon resources',...
-    '*.jpg;*.jpeg','Joint Photographic Experts Group',...
-    '*.pcx','Windows Paintbrush',...
-    '*.png','Portable Network Graphics',...
-    '*.tif;*.tiff','Tagged Image File Format',...
-    '*.xwd','X Windows Dump' ...
-  };
-b = char(a(1));
-for itemp = 3:2:length(a)
-  b = sprintf('%s;%s', b, char(a(itemp)) );
-end
-fileMask = {b,sprintf('All supported image files (%s)',b)};
-for itemp = 1:2:length(a)
-  b = size(fileMask,1)+1 ;
-  c = char(a(itemp));
-  fileMask(b,1) = {sprintf('%s', c) };
-  fileMask(b,2) = {sprintf('%s (%s)',char(a(itemp+1)), c) };
-end
-
-origDir = pwd;
-cd(handles.pathPrgms);
-[fname,pname] = uigetfile(fileMask);
-cd(origDir)
-% if cancel:
-if isequal(fname,0) | isequal(pname,0)
-  %%%%%%%%%%%%%%%%%%%%
-  %%%%%%%%%%%%%%%%%%%%
-  delete (handles.figure1)
-  return
-  %%%%%%%%%%%%%%%%%%%%
-  %%%%%%%%%%%%%%%%%%%%
-end
-[path, fname, ext, version] = fileparts(fname);
-fPathName = strcat(pname, fname);
-% % %make sure the jpg isn't newer. . . if it exists at all
-% % jpgDir = dir(strcat(fPathName,'.jpg'));
-% % needCopy = 0;
-% % if length(jpgDir)
-% %   matDir = dir(strcat(fPathName,'.mat'));
-% %   if length(matDir)
-% %     if (datenum(jpgDir.date) > datenum(matDir.date))
-% %       % source is newer or size is different
-% %       needCopy = 1;
-% %     end
-% %   else % if length(matDir)
-% %     needCopy = 1;
-% %   end % if length(matDir) else
-% %   if needCopy
-% %     formImage = imread(strcat(fPathName,'.jpg'),'jpg');
-% % %     formImage = importdata(strcat(fPathName,'.jpg'));
-% % %     sourceModule = mfilename;
-% % %     save(fPathName,'formImage','sourceModule');
-% %   end % if needCopy
-% % end % if length(jpgDir)
-% % if ~needCopy
-% %   load(strcat(fPathName,'.mat'));
-% % end
-
-formImage = imread(fPathName, ext(2:length(ext)) );
-
-%  get "axes1" to fit the full window
-set(handles.axes1,'position', [0 0 1 1])
-
-% MATLAB doesn't tell you statement requires ", handles.axes1" or
-%a new figure is opened!
-imagesc(formImage,'parent', handles.axes1)
-
-origHidden = get(0,'ShowHiddenHandles');
-
-set(0,'ShowHiddenHandles','on')
-axes(handles.axes1)
-colormap('gray')
-handles.ax1 = axis;
-
-set(0,'ShowHiddenHandles', origHidden)
-%Turn off the axis. Again, MATLAB doesn't show this is the method that works!
-set(handles.axes1,'visible','off')
+if nargin > 2
+  handles = varargin{1};
+  handles.noAlignFileSave = 1;
+else %if nargin
+  fig = openfig(mfilename,'reuse');
+  
+  % Use system color scheme for figure:
+  set(fig,'Color',get(0,'defaultUicontrolBackgroundColor'));
+  
+  % Generate a structure of handles to pass to callbacks, and store it. 
+  handles = guihandles(fig);
+  handles.noAlignFileSave = 0;
+  guidata(fig, handles);
+  
+  [err, errMsg, outpostNmNValues] = OutpostINItoScript;
+  handles.pathAddOns = outpostValByName('DirAddOns', outpostNmNValues);
+  handles.pathPrgms = outpostValByName('DirAddOnsPrgms', outpostNmNValues);
+  
+  %file stored in .mat is much faster loading
+  fPathName = strcat(handles.pathPrgms, 'ICS-213-SCC-Message-Form1 copy');
+  
+  fPathName='F:\Downloads\Ham Radio\Packet_soundcard\Computer screen shoots';
+  
+  fPathName = 'ICS-213-SCC-Message-Form 1';
+  
+  %list of all formats supported by "imread"
+  a = {'*.bmp','Windows Bitmap',...
+      '*.cur','Windows Cursor resources',...
+      '*.hdf','Hierarchical Data Format',...
+      '*.ico','Windows Icon resources',...
+      '*.jpg;*.jpeg','Joint Photographic Experts Group',...
+      '*.pcx','Windows Paintbrush',...
+      '*.png','Portable Network Graphics',...
+      '*.tif;*.tiff','Tagged Image File Format',...
+      '*.xwd','X Windows Dump' ...
+    };
+  b = char(a(1));
+  for itemp = 3:2:length(a)
+    b = sprintf('%s;%s', b, char(a(itemp)) );
+  end
+  fileMask = {b,sprintf('All supported image files (%s)',b)};
+  for itemp = 1:2:length(a)
+    b = size(fileMask,1)+1 ;
+    c = char(a(itemp));
+    fileMask(b,1) = {sprintf('%s', c) };
+    fileMask(b,2) = {sprintf('%s (%s)',char(a(itemp+1)), c) };
+  end
+  
+  origDir = pwd;
+  cd(handles.pathPrgms);
+  [fname,pname] = uigetfile(fileMask);
+  cd(origDir)
+  % if cancel:
+  if isequal(fname,0) | isequal(pname,0)
+    %%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%
+    delete (handles.figure1)
+    return
+    %%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%
+  end
+  [path, fname, ext, version] = fileparts(fname);
+  fPathName = strcat(pname, fname);
+  % % %make sure the jpg isn't newer. . . if it exists at all
+  % % jpgDir = dir(strcat(fPathName,'.jpg'));
+  % % needCopy = 0;
+  % % if length(jpgDir)
+  % %   matDir = dir(strcat(fPathName,'.mat'));
+  % %   if length(matDir)
+  % %     if (datenum(jpgDir.date) > datenum(matDir.date))
+  % %       % source is newer or size is different
+  % %       needCopy = 1;
+  % %     end
+  % %   else % if length(matDir)
+  % %     needCopy = 1;
+  % %   end % if length(matDir) else
+  % %   if needCopy
+  % %     formImage = imread(strcat(fPathName,'.jpg'),'jpg');
+  % % %     formImage = importdata(strcat(fPathName,'.jpg'));
+  % % %     sourceModule = mfilename;
+  % % %     save(fPathName,'formImage','sourceModule');
+  % %   end % if needCopy
+  % % end % if length(jpgDir)
+  % % if ~needCopy
+  % %   load(strcat(fPathName,'.mat'));
+  % % end
+  
+  formImage = imread(fPathName, ext(2:length(ext)) );
+  
+  %  get "axes1" to fit the full window
+  set(handles.axes1,'position', [0 0 1 1])
+  
+  % MATLAB doesn't tell you statement requires ", handles.axes1" or
+  %a new figure is opened!
+  imagesc(formImage,'parent', handles.axes1)
+  
+  origHidden = get(0,'ShowHiddenHandles');
+  
+  set(0,'ShowHiddenHandles','on')
+  axes(handles.axes1)
+  colormap('gray')
+  handles.ax1 = axis;
+  
+  set(0,'ShowHiddenHandles', origHidden)
+  %Turn off the axis. Again, MATLAB doesn't show this is the method that works!
+  set(handles.axes1,'visible','off')
+end % if nargin else
 
 %action when mouse moved: updates the X-Y location of the mouse
 set(handles.figure1,'WindowButtonMotionFcn', '');
@@ -244,6 +251,20 @@ set(handles.figure1,'WindowButtonUpFcn','figImageAlign(''figImageAlign_WindowBut
 set(handles.figure1,'KeyPressFcn','')
 set(handles.figure1,'KeyPressFcn','figImageAlign(''figImageAlign_KeyPressFcn'',gcbo,[],guidata(gcbo))')
 
+fprintf('\nReady for edge alignments. Press the appropriate key &');
+fprintf('\n  then move the mouse in the area of the edge of interest,');
+fprintf('\n  press and hold the left mouse button to get the alignment');
+fprintf('\n  line to appear/move.  Adjust the mouse position as desired.');
+fprintf('\n  Release the mouse button to freeze the line position.  Continue');
+fprintf('\n  to the next edge using the keys per below.  You may alter any');
+fprintf('\n  edge at any time.  ');
+fprintf('\n L: start/alter left edge');
+fprintf('\n R: start/alter right edge');
+fprintf('\n T: start/alter top edge');
+fprintf('\n B: start/alter bottom edge');
+fprintf('\n');
+fprintf('\n S: save');
+fprintf('\n');
 handles.mouseActive = 0;
 handles.whichEdge = 0;
 handles.ptch(1:4) = 0;
@@ -252,7 +273,7 @@ varargout{1} = err;
 varargout{2} = errMsg;
 varargout{3} = handles.figure1;
 % --------------------------------------------------------------------
-function figImageAlign_KeyPressFcn(h, eventdata, handles, varargin)
+function handles = figImageAlign_KeyPressFcn(h, eventdata, handles, varargin)
 %key pressed
 currentCharacter = get(gcf,'CurrentCharacter') ;
 switch lower(currentCharacter)
@@ -265,7 +286,7 @@ case 't'
 case 'b'
   selectColr(handles, 4);
 case 's'
-  [err, errMsg] = saveAlignment(handles);
+  [err, errMsg, handles] = saveAlignment(handles);
 otherwise
 end
 % --------------------------------------------------------------------
@@ -338,8 +359,15 @@ set(handles.figure1,'WindowButtonMotionFcn', 'figImageAlign(''figImageAlign_Wind
 
 guidata(handles.figure1, handles);
 % --------------------------------------------------------------------
-function [err, errMsg] = saveAlignment(handles)
+function [err, errMsg, handles] = saveAlignment(handles)
 b = calcNrmlEdges(handles);
+if handles.noAlignFileSave
+  %indicate all done
+  handles.noAlignFileSave = 2;
+  handles.alignmentBox = b;
+  guidata(handles.figure1, handles);
+  return
+end
 %top_fromMsgHdrBtm = b(3);left_fromMsgHdr = b(1);right_fromMsgHdr = b(2);bottom_fromOpratrUseBtm = b(4)
 [err, errMsg, fPathName] = write213Alignment(strcat(handles.pathAddOns,'_jpg'), b(3), b(1), b(2), b(4), 1);
 if err

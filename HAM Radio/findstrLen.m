@@ -1,4 +1,4 @@
-function [pos] = findstrLen(matchTxt, strToSearch)
+function [pos] = findstrlen(matchTxt, strToSearch)
 if (length(matchTxt) > length(strToSearch))
   pos = 0;
 else

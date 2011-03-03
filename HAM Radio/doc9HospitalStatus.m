@@ -77,35 +77,12 @@ function [err, errMsg, printedName, printedNamePath, form] = doc9HospitalStatus(
 % 46.  :  [Checked]
 % #EOF
 
-[err, errMsg, modName] = initErrModName(mfilename) ;
-[form, printedName, printedNamePath] = clearFormInfo;
+[err, errMsg, modName, form, printedName, printedNamePath, printEnable, copyList, numCopies, ...
+    formField, h_field, textLine, fieldsFound, spaces, textToPrint]...
+  = startReadPACF(mfilename, receivedFlag, pathDirs, printMsg, '-old form', msgFname, fid);
 
-if nargin < 7
-  h_field = 0;
-end
-[err, errMsg, printEnable, copyList, numCopies, formField, h_field] = readPrintCnfg(receivedFlag, pathDirs, printMsg, '-old form', msgFname);
-if err
-  printEnable = 0;
-  errMsg = strcat(modName, errMsg);
-  fprintf('\n%s', errMsg);
-end
-fieldsFound = 0;
-
-% % err = 1;
-% % errMsg = 'old form - not available';
-% % if err
-% %   printEnable = 0;
-% %   errMsg = strcat(modName, errMsg);
-% %   fprintf('\n%s', errMsg);
-% % end
-% % fieldsFound = 0;
-
-% skip through the comment/heading
-textLine = '#' ;
-while (1==findstrchr('#', textLine) & ~feof(fid))
-  textLine = fgetl(fid);
-end
-
+addressee = '';
+originator = '';
 while 1 % read & detect the field for each line of the entire message
   % clear the print line so the line will not be altered unless the field
   %   has an entry. 

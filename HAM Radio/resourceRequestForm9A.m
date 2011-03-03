@@ -1,4 +1,4 @@
-function [err, errMsg, printedName, printedNamePath, form] = resourceRequestForm9A(fid, fname, receivedFlag, PathConfig, printMsg, printer);
+function [err, errMsg, printedName, printedNamePath, form] = resourceRequestForm9A(fid, fname, receivedFlag, pathDirs, printEnable, printer, outpost, outpostNmNValues);
 
 % !PACF! origMsg#_U/P_ResRec9_REQUESTING FACILITY
 % # RESOURCE REQUEST FORM #9A 
@@ -22,13 +22,13 @@ function [err, errMsg, printedName, printedNamePath, form] = resourceRequestForm
  
 
 [err, errMsg, modName] = initErrModName(mfilename) ;
-[form, printedName, printedNamePath] = clearFormInfo;
 
-% skip through the comment/heading
-textLine = '#' ;
-while (1==findstrchr('#', textLine) & ~feof(fid))
-  textLine = fgetl(fid);
-end
+[err, errMsg, modName, form, printedName, printedNamePath, printEnable, copyList, numCopies, ...
+    formField, h_field, textLine, fieldsFound, spaces, textToPrint]...
+  = startReadPACF(mfilename, receivedFlag, pathDirs, printEnable, 'Resource Request #9A', fname, fid);
+
+addressee = '';
+originator = '';
 
 while 1 % read & detect the field for each line of the entire message
   % clear the print line so the line will not be altered unless the field
@@ -50,29 +50,53 @@ while 1 % read & detect the field for each line of the entire message
   switch fieldID
   case 'facnam' %
     form.subject = fT ;
+    fieldsFound = fieldsFound + 1;
   case '1.' %
     form.date = fT;
+    fieldsFound = fieldsFound + 1;
   case '2.' %
     form.time = fT;
+    fieldsFound = fieldsFound + 1;
   case '3.' % requesting facility
     form.comment = fT;
+    fieldsFound = fieldsFound + 1;
   case 'A.'
     form.senderMsgNum = fT ;
+    fieldsFound = fieldsFound + 1;
   case 'MsgNo'
     form.MsgNum = fT ;
+    fieldsFound = fieldsFound + 1;
   case 'C.'
     form.receiverMsgNum = fT ;
+    fieldsFound = fieldsFound + 1;
   case 'D.'
     form.sitSevere = fT ;
+    fieldsFound = fieldsFound + 1;
   case 'E.'
     form.handleOrder = fT ;
+    fieldsFound = fieldsFound + 1;
   case 'F.'
     form.replyReq = fT; 
+    fieldsFound = fieldsFound + 1;
   case 'replyby'
     form.replyWhen = fT ;
+    fieldsFound = fieldsFound + 1;
   otherwise
   end
+  if printEnable
+    [err, errMsg, textToPrint, h_field, formField, moveNeeded] = fillFormField(fieldID, fieldText, formField, h_field, textToPrint, spaces, outpostNmNValues);
+  else %if printEnable
+    %not printing - exit when we've extracted all we need
+    if fieldsFound > 11
+      break
+    end
+  end % if printEnable else
   textLine = fgetl(fid);
 end % while 1 % read & detect the field for each line of the entire message
 
 fcloseIfOpen(fid);
+
+if (~err & printEnable)
+  [err, errMsg, printedNamePath, printedName] = ...
+    formFooterPrint(printer, printEnable, copyList, numCopies, h_field, formField, fname, originator, addressee, textToPrint, outpost, receivedFlag);
+end % if (~err & printEnable)

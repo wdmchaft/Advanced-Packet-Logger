@@ -33,7 +33,7 @@ for coreNdx = 1:length(coreNameList)
   [nonMLFunctionCount, nonMLFunctionNames] = findNonMLfunctions(list);
   
   [err, errMsg, outpostNmNValues] = OutpostINItoScript; 
-  if findstrLen('OutpostINItoScript', coreName)
+  if findstrlen('OutpostINItoScript', coreName)
     toPath = outpostValByName('DirOutpost', outpostNmNValues);
   else
     toPath = outpostValByName('DirAddOnsPrgms', outpostNmNValues);

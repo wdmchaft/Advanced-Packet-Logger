@@ -625,6 +625,7 @@ function varargout = listboxAllStation_Callback(h, eventdata, handles, varargin)
 % we'll enable the buttons which will open the message for viewing.  The
 % exact buttons depend on whether the message is a PACF.
 %When the operator selects the title/heading line, we'll disable the viewing buttons.
+set(handles.listboxAllStation,'max',1)
 val = get(h, 'Val');
 a = 0 ;
 % if operator chose a message line from the log (i.e: not the heading nor an informational line)....
@@ -642,6 +643,7 @@ if ~(ismember(val, handles.nonLogLines))
     %. . . allow the buttons to be appropriately enabled.
     a = 1;
   end
+  [err, errMsg] = dispMsg2Scoreboard(handles, ud.listSortedNdx) ;
 end 
 if a
   %viewing of messages is enabled - text will be enabled & decide if PACF also.
@@ -1019,6 +1021,7 @@ if found
   for itemp = 1:length(logged)
     logged(itemp).shortOutpostDTime = cleanDateTime(logged(itemp).outpostDTime, logDate);
     logged(itemp).shortFormDTime = cleanDateTime(logged(itemp).formDTime, logDate);
+    logged(itemp).shortOutpostPostTime = cleanDateTime(logged(itemp).outpostPostTime, logDate);
   end %for itemp = 1:length(logged)
 end % if found
 

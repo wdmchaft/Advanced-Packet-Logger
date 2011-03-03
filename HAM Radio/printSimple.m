@@ -102,9 +102,9 @@ catch % try %overall safety value
     if fid > 0
       [err_1, errMsg_1, date_time] = datevec2timeStamp(now);
       fprintf(fid, '\r\n%s error: %s ', date_time, errMsg);
-      fprintf(fid, '\r\n    file: %s', fname);
+      fprintf(fid, '\r\n    file: %s', fpathName);
       fprintf('\n%s error: %s', date_time, errMsg);
-      fprintf('\n    file: %s', fname);
+      fprintf('\n    file: %s', fpathName);
       fclose(fid);
     end
   catch
