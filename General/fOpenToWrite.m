@@ -44,10 +44,10 @@ if fidOut < 1
       titl = 'Write Blocked';
     end
     button = questdlg(sprintf('Unable to open to %s to "%s".  It might be open in Excel or another program.  If you want this file to be update now, please close that application and press Retry (%s %i)', a, filePathName, str, fidOut),...
-      titl, 'Retry','Cancel','Retry');
+      titl, 'Retry','Skip/cancel','Retry');
     if strcmp(button,'Retry')
       [fidOut, str] = fopen(filePathName,writeMode);
-    elseif strcmp(button,'Cancel')
+    elseif strcmp(button,'Skip/cancel')
       err = 1;
       errMsg = sprintf('%s: user abort - failed open to %s to "%s"', modName, a, filePathName);
       return

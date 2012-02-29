@@ -1,4 +1,5 @@
 function [pos] = findstrlen(matchTxt, strToSearch)
+%Returns the location of the complete string 'matchTxt' in 'strToSearch'
 if (length(matchTxt) > length(strToSearch))
   pos = 0;
 else

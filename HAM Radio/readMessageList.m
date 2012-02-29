@@ -26,8 +26,16 @@ if (fid > 0)
       else
         messageList(itemp).name = {textLine} ;
       end
-      b = dir(strcat(PathToList, textLine));
-      messageList(itemp).date = b.date;
+      %pull the date from the file's name
+      % starts with R or S followed by _YrMoDa_HrMnSec_Subject....  
+      % vvvvvvvv  same code in writeProcLogIfIncomplete vvvvvvv
+      b = findstrchr('_', textLine);
+      if (length(b) > 2)
+        messageList(itemp).date = {textLine(b(1)+1:b(3)-1)};
+      else
+        messageList(itemp).date = {};
+      end % if (length(b) > 2)
+      % ^^^^^^^^  same code in writeProcLogIfIncomplete ^^^^^^^^
       [err, errMsg, messageList(itemp).postDateTime] = extractTextFromCSVText(textLine, commaAt, 2) ;
     end % if length(textLine)
   end % while ~feof(fid)

@@ -7,7 +7,7 @@ function [codeVersion, reply] = about_packetLogSettings_private()
 
 codeVersion = 0.000000;
 if codeVersion
-  reply = sprintf('packetLogSettings Version %.3f (Debug) created 22-Feb-2011 21:00:59.', codeVersion);
+  reply = sprintf('packetLogSettings Version %.3f (Debug) created 25-Jan-2012 09:41:48.', codeVersion);
 else % if codeVersion
-  reply = sprintf('packetLogSettings created  (Debug)22-Feb-2011 21:00:59.');
+  reply = sprintf('packetLogSettings created  (Debug)25-Jan-2012 09:41:48.');
 end % if codeVersion

@@ -7,7 +7,7 @@ function [codeVersion, reply] = about_findNewOutpostMsgs_privat()
 
 codeVersion = 0.000000;
 if codeVersion
-  reply = sprintf('findNewOutpostMsgs Version %.3f (Debug) created 21-Jan-2011 09:24:37.', codeVersion);
+  reply = sprintf('findNewOutpostMsgs Version %.3f (Debug) created 12-Jan-2012 11:33:04.', codeVersion);
 else % if codeVersion
-  reply = sprintf('findNewOutpostMsgs created  (Debug)21-Jan-2011 09:24:37.');
+  reply = sprintf('findNewOutpostMsgs created  (Debug)12-Jan-2012 11:33:04.');
 end % if codeVersion

@@ -1,4 +1,4 @@
-function [err, errMsg, printedName, printedNamePath, form] = doc9BedStatus(fid, fname, receivedFlag, pathDirs, printEnable, printer, outpost, h_field);
+function [err, errMsg, printed, form] = doc9BedStatus(fid, fname, receivedFlag, pathDirs, printer, outpostHdg, outpostNmNValues);
 
 %used for the pre-03-30-10 version
 % for later "doc9bedsHospitalStatusReport" is used
@@ -32,9 +32,10 @@ function [err, errMsg, printedName, printedNamePath, form] = doc9BedStatus(fid, 
 % 39.   [Psychiatric Beds] NOT Checked  NOT Checked [Psychiatric Beds]
 % #EOF
 
-[err, errMsg, modName, form, printedName, printedNamePath, printEnable, copyList, numCopies, ...
-    formField, h_field, textLine, fieldsFound, spaces, textToPrint]...
-  = startReadPACF(mfilename, receivedFlag, pathDirs, printEnable, '-no form', fname, fid);
+%when/if a form is known, enter the form name without the leading "-"
+[err, errMsg, modName, form, printed, printer ...
+    formField, h_field, textLine, fieldsFound, spaces, textToPrint, addressee, originator]...
+  = startReadPACF(mfilename, receivedFlag, pathDirs, printer, '-no form', fname, fid, outpostHdg);
 
 while 1 % read & detect the field for each line of the entire message
   % clear the print line so the line will not be altered unless the field
@@ -56,39 +57,65 @@ while 1 % read & detect the field for each line of the entire message
   switch fieldID
   case 'FACILITY NAME' %
     form.subject = fT ;
+    fieldsFound = fieldsFound + 1;
   case 'DATE' %
     form.date = fT;
+    fieldsFound = fieldsFound + 1;
   case 'TIME' %
     form.time = fT;
+    fieldsFound = fieldsFound + 1;
   case '1.' %
     if strcmp('checked', lower(fieldText))
       form.comment = sprintf('Not Functional');
+      fieldsFound = fieldsFound + 1;
     end
   case '2.' %
     if strcmp('checked', lower(fieldText))
       form.comment = sprintf('Partially Functional');
+      fieldsFound = fieldsFound + 1;
     end
   case '3.' %
     if strcmp('checked', lower(fieldText))
       form.comment = sprintf('Fully Functional');
+      fieldsFound = fieldsFound + 1;
     end
   case 'A.'
     form.senderMsgNum = fT ;
+    fieldsFound = fieldsFound + 1;
   case 'MsgNo'
     form.MsgNum = fT ;
+    fieldsFound = fieldsFound + 1;
   case 'C.'
     form.receiverMsgNum = fT ;
+    fieldsFound = fieldsFound + 1;
   case 'D.'
     form.sitSevere = fT ;
+    fieldsFound = fieldsFound + 1;
   case 'E.'
     form.handleOrder = fT ;
+    fieldsFound = fieldsFound + 1;
   case 'F.'
     form.replyReq = fT; 
+    fieldsFound = fieldsFound + 1;
   case 'replyby'
     form.replyWhen = fT ;
+    fieldsFound = fieldsFound + 1;
   otherwise
   end
+  if printer.printEnable
+    [err, errMsg, textToPrint, h_field, formField, moveNeeded] = fillFormField(fieldID, fieldText, formField, h_field, textToPrint, spaces, outpostNmNValues);
+  else %if printer.printEnable
+    %not printing - exit when we've extracted all we need
+    if fieldsFound > 10
+      break
+    end
+  end % if printer.printEnable else
   textLine = fgetl(fid);
 end % while 1 % read & detect the field for each line of the entire message
 
 fcloseIfOpen(fid);
+
+if (~err & printer.printEnable)
+  [err, errMsg, printed] = ...
+    formFooterPrint(printer, h_field, formField, fname, originator, addressee, textToPrint, outpostHdg, receivedFlag);
+end % if (~err & printer.printEnable)

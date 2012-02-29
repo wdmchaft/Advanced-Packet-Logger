@@ -206,7 +206,7 @@ if Status == 1
   %remember where we are
   originalPWD = pwd;
   % try to switch to the new directory
-  cd (NewDirectory);
+  cd (endWithBackSlash(NewDirectory));
   % see where we are
   currentDir = pwd;
   %return

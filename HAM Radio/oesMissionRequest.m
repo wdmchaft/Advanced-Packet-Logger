@@ -1,4 +1,82 @@
-function [err, errMsg, printedName, printedNamePath, form] = oesMissionRequest(fid, fname, receivedFlag, pathDirs, printEnable, printer, outpost, h_field);
+function [err, errMsg, printed, form] = oesMissionRequest(fid, msgFname, receivedFlag, pathDirs, printer, outpostHdg, h_field);
+
+% !PACF! MSG#_E/I_OESMis_City of Mountain View if city or special
+% # OES MISSION REQUEST 
+% # JS-ver. 4.3.2, 07-23-10, PR34
+% # FORMFILENAME: OESMissionReq.html
+% # Form Item numbers are followed by a colon (:)
+% # Answers are enclosed in brackets ( [ ] )
+% # Note: The symbol ¿ is NOT a bug. It is used in Textarea formatting.
+% A.0: [SNDR#]
+% MsgNo: [MSG#]
+% C.0: [RECVR#]
+% D.0: [EMERGENCY]
+% E.0: [IMMEDIATE]
+% F.0: [Yes]
+% replyby: [reply by]
+% A: [mission numer]
+% B: [Black-Flash]
+% C: [Purple-Coordinating]
+% D: [03/11/2011 07:20 PM]
+% 1a: [City of Mountain View]
+% 1b: [if city or special]
+% 1c: [¿Agency:¿Name:¿Position:¿Phone:¿Fax:¿Pager:¿Cell:]
+% 1d: [related event/incident]
+% 2a: [¿requested mission]
+% 2b: [Base Camp]
+% 2c: [Needed By Date]
+% 2d: [checked]
+% 2e: [checked]
+% 2f: [checked]
+% 2g: [checked]
+% 2h: [checked]
+% 2i: [checked]
+% 2j: [checked]
+% 2k: [Other:]
+% 4a: [Site Name]
+% 4b: [Site Type]
+% 4c: [Street Address]
+% 4d: [Apt o]
+% 4e: [City]
+% 4f: [CA]
+% 4g: [Zip]
+% 4h: [United States]
+% 4i: [Intersection - Street 1]
+% 4j: [Intersection - Street 2]
+% 4k: [County]
+% 4l: [Geographic Area]
+% 4m: [¿Additional Location Information]
+% 5a: [Geo Located By]
+% 5b: [Latitude]
+% 5c: [Longitude]
+% 5d: [¿Contact on scene]
+% 6: [¿Special Instructions]
+% 7a: [Individual]
+% 7b: [Organization/Location:]
+% 7c: [Position]
+% 7d: [Agency]
+% 7e: [¿Summary of OES¿actions taken]
+% 8a: [AFRCC]
+% 8b: [If selection not in list above, enter here]
+% 8c: [Agency POC]
+% 8d: [Phone]
+% 8e: [Fax Number]
+% 8f: [Pager/Alt#]
+% 8g: [8gOther]
+% 8h: [¿Summary of¿actions taken]
+% 8i: [Estimated Res]
+% 9a: [¿Group]
+% 9b: [¿Individual]
+% 10a: [No]
+% 10b: [¿Message]
+% 10c: [¿List Recipients]
+% 10d: [¿Notification List]
+% 10e: []
+% 11: [¿Comment]
+% 12: [¿Web Pages]
+% #EOF
+% 
+
 
 % !PACF!
 % # OES MISSION REQUEST 
@@ -69,9 +147,9 @@ function [err, errMsg, printedName, printedNamePath, form] = oesMissionRequest(f
 % 12: [ATTACHMENTS Web Pages]
 % #EOF
 
-[err, errMsg, modName, form, printedName, printedNamePath, printEnable, copyList, numCopies, ...
-    formField, h_field, textLine, fieldsFound, spaces, textToPrint]...
-  = startReadPACF(mfilename, receivedFlag, pathDirs, printEnable, '-no form', fname, fid);
+[err, errMsg, modName, form, printed, printer ...
+    formField, h_field, textLine, fieldsFound, spaces, textToPrint, addressee, originator]...
+  = startReadPACF(mfilename, receivedFlag, pathDirs, printer, 'OESMissionReq', msgFname, fid, outpostHdg);
 
 while 1 % read & detect the field for each line of the entire message
   % clear the print line so the line will not be altered unless the field
@@ -118,8 +196,17 @@ while 1 % read & detect the field for each line of the entire message
     form.replyWhen = fT ;
   otherwise
   end
+  if printer.printEnable 
+    [err, errMsg, textToPrint] = fillFormField(fieldID, fieldText, formField, h_field, '', '') ;
+  end % if printer.printEnable
   %determine where this fieldID is in our list:
   textLine = fgetl(fid);
 end % while 1 % read & detect the field for each line of the entire message
 
 fcloseIfOpen(fid);
+
+if (~err & printer.printEnable)
+  addressee = 'Planning';
+  [err, errMsg, printed] = ...
+    formFooterPrint(printer, h_field, formField, msgFname, originator, addressee, textToPrint, outpostHdg, receivedFlag);
+end % if (~err & printer.printEnable)

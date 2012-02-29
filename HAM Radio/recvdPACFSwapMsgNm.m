@@ -106,8 +106,8 @@ else %if (found > 9)
     %need to create "sndrMsgNm"
     %  give it the passed in field ID the found number/ID. . .
     sndrMsgNmText = sprintf('%s: [%s]', whenRcvdFieldID, origMsgNum);
-    %...and arbitrarily insert it just before the myMsgNm line
-    sndrMsgNmCnt = myMsgNmCnt - 1;
+    %...and arbitrarily insert it just before the myMsgNm line: make it negative to show we created it!
+    sndrMsgNmCnt = -(myMsgNmCnt - 1);
   case 2 % only whenRcvdFieldID found
     %there is no message number to insert so we'll create a blank line.
     sndrMsgNmText = sprintf('%s: [%s', sndrMsgNmText, sndrMsgLineEnd);

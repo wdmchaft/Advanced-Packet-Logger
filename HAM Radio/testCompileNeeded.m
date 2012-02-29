@@ -63,6 +63,15 @@ for coreNdx = 1:length(coreNameList)
   end
 end
 
+fid = fopen(strcat(mfilename, '.txt'),'r');
+if (fid > 0)
+  fclose(fid);
+  delete(strcat(mfilename, '.txt'));
+end
+diary(strcat(mfilename, '.txt'))
+diary on
+[err, errMsg, date_time, prettyDateTime] = datevec2timeStamp(now);
+fprintf('Results of %s run at %s:', mfilename, prettyDateTime);
 for coreNdx = 1:size(newerList, 1)
   f = 0 ;
   for newer = 1:size(newerList, 2)
@@ -80,3 +89,5 @@ for coreNdx = 1:length(coreNameList)
     fprintf('\nNeed to compile %s.', char(coreNameList(coreNdx)));
   end
 end
+diary off
+edit(strcat(mfilename, '.txt'))

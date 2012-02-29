@@ -44,12 +44,12 @@ pathFrom = endWithBackSlash(pathFrom);
 pathTo = endWithBackSlash(pathTo);
 if ~exist(pathTo)
   err = 1 ;
-  errMsg = fprintf('%s: unable to find "to": %s', modName, pathTo);
+  errMsg = fprintf('\n%s: unable to find "to": %s', modName, pathTo);
   return
 end
 if ~exist(pathFrom)
   err = 1 ;
-  errMsg = fprintf('%s: unable to find "from": %s', modName, pathFrom);
+  errMsg = fprintf('\n%s: unable to find "from": %s', modName, pathFrom);
   return
 end
 

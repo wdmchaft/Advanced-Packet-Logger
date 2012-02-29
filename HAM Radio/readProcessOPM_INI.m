@@ -15,7 +15,7 @@ function [err, errMsg, printer] = readProcessOPM_INI(pathToINI);
 
 [err, errMsg, modName] = initErrModName(mfilename) ;
 
-pathToINI = endWithBackSlash(pathToINI);
+% % 10/22/11 pathToINI = endWithBackSlash(pathToINI);
 fidINI = fopen(sprintf('%sProcessOPM.ini', pathToINI),'r');
 %default conditions.  Will be recorded in file during file creation
 printEnable = 0;

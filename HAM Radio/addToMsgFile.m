@@ -79,6 +79,7 @@ end
 %the Script.
 
 headingEndLine = linesRead;
+lastPACFheadingLine = 0;
 myMsgNmCnt = 0;
 sndrMsgNmCnt = 0;
 PACF = 0;
@@ -110,14 +111,16 @@ if receivedFlag
     case 3 % 'EOC MESSAGE FORM',  ...
       sndrsMsgNoFieldID = '2.';
       recvrMsgNoFieldID = '3.';
-      recvrInfoList = {'OpCall','OpName','OpDate','OpTime'};
+      %these fields will have their contents updated to replace the sender's information
+      % with information about the receiver.
+      recvrInfoList = {'Rec-Sent','OpCall','OpName','OpDate','OpTime'};
     case 4 % 'CITY MUTUAL AID REQUEST',  ...
     case 5 % 'SHORT FORM HOSPITAL STATUS',  ...
     case 6 % 'HOSPITAL STATUS',  ...
     case 7 % 'HOSPITAL-BEDS',  ...
     case 8 % 'OES MISSION REQUEST',  ... 
       sndrsMsgNoFieldID = 'A.0';
-      recvrMsgNoFieldID = 'C.0';
+      recvrMsgNoFieldID = 'C.0';  %  Rec-Sent: [Sent]  Rec-Sent: [Received]
     case 9 % 'SEMS SITUATION'
     case 10 % FORM DOC-9 HOSPITAL-STATUS REPORT
     case 11 % RESOURCE REQUEST FORM #9A
@@ -131,6 +134,7 @@ if receivedFlag
         textLine = fgetl(fid);
         linesRead = linesRead + 1;
       end
+      lastPACFheadingLine = linesRead -  1;
       [err, errMsg, myMsgNmCnt, myMsgNmText, myMsgNmEnd, sndrMsgNmCnt, sndrMsgNmText]...
         = recvdPACFSwapMsgNm(fid, textLine, linesRead, origMsgFieldID, sndrsMsgNoFieldID);
       if err
@@ -171,6 +175,12 @@ for linesRead = 1:headingEndLine
   end % if ~length(outpostValByName('LMIflag', outpostNmNValues))
   fprintf(fidOut,'%s\r\n', textLine);
 end % for linesRead = 1:headingEndLine
+if lastPACFheadingLine
+  for linesRead = linesRead+1:lastPACFheadingLine
+    textLine = fgetl(fid);
+    fprintf(fidOut,'%s\r\n', textLine);
+  end % for linesRead = linesRead:lastPACFheadingLine
+end
 %if this is a received message of type PACF and we've moved the original
 %   Msg# to the Sender's Msg# field as indicated by either myMsgNm or sndrMsgNm ~= 0
 if receivedFlag & PACF & (myMsgNmCnt | sndrMsgNmCnt)%%& ~length(outpostValByName('LMIflag', outpostNmNValues))
@@ -179,74 +189,121 @@ if receivedFlag & PACF & (myMsgNmCnt | sndrMsgNmCnt)%%& ~length(outpostValByName
     linesRead = insertPACF(fid, fidOut, linesRead, myMsgNmCnt, myMsgText);
     linesRead = insertPACF(fid, fidOut, linesRead, sndrMsgNmCnt, sndrMsgNmText);
   else % if myMsgNmCnt < sndrMsgNmCnt
-    %if there was a line with the sender msg number...
-    if sndrMsgNmCnt
-      linesRead = insertPACF(fid, fidOut, linesRead, sndrMsgNmCnt, sndrMsgNmText);
-    end
+    %if there was a line with the sender msg number or if we created one...
+    %            if we created the line, "sndrMsgNmCnt" will be negative & "insertPACF" will treat it as an insert, not a replace.   
+    linesRead = insertPACF(fid, fidOut, linesRead, sndrMsgNmCnt, sndrMsgNmText);
     linesRead = insertPACF(fid, fidOut, linesRead, myMsgNmCnt, myMsgText);
   end % if myMsgNmCnt < sndrMsgNmCnt else
 end % if receivedFlag & PACF & (myMsgNmCnt | sndrMsgNmCnt) %%& ~length(outpostValByName('LMIflag', outpostNmNValues))
 
-Ndx = 0;
 if receivedFlag & PACF
   % if ICS213 we'll replace the sending ham's info with the receiving info
+  Ndx = [];
   if pacfListNdx == 3
-    Ndx = length(recvrInfoList);
+    Ndx = [1:length(recvrInfoList)];
     %explicit tracking of all items we want to replace.
-    found = 0;
   end
-end % if receivedFlag 
-
-while ~feof(fid)
-  textLine = fgetl(fid);
-  %if we've got more fields to replace/update
-  if (Ndx)
-    a = findstrchr(':', textLine);
-    b = find(ismember(recvrInfoList, textLine(1:a-1)));
-    if b
-      %if we've not found this item already, update the list
-      if ~find(found ==  b)
-        found(length(found)+1) = b;
-        Ndx = max(0, Ndx - 1);
+  % loop until the end of the file
+  while ~feof(fid) 
+    % look at each line of the PACFORM.  There is not guarantee the operator
+    %  hadn't added lines after the PACFORM.... not that they are likely to be seen by anybody!!
+    %loop until EOF or break when #EOF found!
+    while ~feof(fid)
+      textLine = fgetl(fid) ;
+      %if we've got more fields to replace/update
+      if length(Ndx)
+        a = findstrchr(':', textLine);
+        % which member matches...
+        b = find(ismember(recvrInfoList(Ndx), textLine(1:a-1)));
+        % if a match...
+        if b
+          %... do the update
+          [textLine, Ndx] = updateRecvrInfo(recvrInfoList(Ndx), b, outpostNmNValues, outpost, textLine, Ndx) ;  
+          Ndx(b) = 0;
+          % remove the just processed item -> faster execution w/ shorter list
+          Ndx = Ndx(find(Ndx));
+        end %if b
+      end %if length(Ndx)
+      if (findstrchr('#EOF', textLine) ~= 1)
+        % pulled 6/6/11: redundant!!        fprintf(fidOut,'%s\r\n', textLine);
+        break
       end
-      switch char(recvrInfoList(b))
-      case 'OpCall'
-        d = outpostValByName('StationID', outpostNmNValues);
-      case 'OpName'
-        d = outpostValByName('NameID', outpostNmNValues);
-      case 'OpDate'
-        a = findstrchr(' ', outpost.dateTime);
-        d = outpost.dateTime(1:a-1);
-      case 'OpTime'
-        a = findstrchr(':', outpost.time);
-        if a
-          d = strcat(outpost.time(1:a-1),outpost.time(a+1:length(outpost.time)));
-        else
-          d = outpost.time;
-        end
-      otherwise
-      end %switch recvrInfoList(b)
-      a = findstrchr('[', textLine);
-      b = findstrchr(']', textLine);
-      textLine = sprintf('%s%s%s', textLine(1:a), d, textLine(b:length(textLine)) );
-    end %if b
-  end %if Ndx
-  fprintf(fidOut,'%s\r\n', textLine);
-end % while ~feof(fid)
+    end % while (findstrchr('#EOF', textLine) ~= 1) & ~feof(fid)
+    if (findstrchr('#EOF', textLine) == 1) & length(Ndx)
+      for itemp = 1:length(Ndx)
+        b = Ndx(itemp);
+        tl = sprintf('%s: []', recvrInfoList{b});
+        [tl, Ndx] = updateRecvrInfo(recvrInfoList, b, outpostNmNValues, outpost, tl, Ndx) ;  
+        fprintf(fidOut,'%s\r\n', tl);
+      end % for itemp = 1:length(Ndx)
+    end % if (findstrchr('#EOF', textLine) == 1) & length(Ndx)
+    fprintf(fidOut,'%s\r\n', textLine);
+  end % while ~feof(fid)
+else % if receivedFlag & PACF
+  %sent or not a PACF 
+  while ~feof(fid)
+    textLine = fgetl(fid) ;
+    fprintf(fidOut,'%s\r\n', textLine);
+  end % while ~feof(fid)
+end % if receivedFlag & PACF else
 fcloseIfOpen(fid);
 fcloseIfOpen(fidOut);
 
+%all done: rename from .txt to .mss
 [err, errMsg] = renameMsg(pathToFile, modName, fPathName, fPathNameOut);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function linesRead = insertPACF(fid, fidOut, linesRead, lineCnt, newText);
-for linesRead = (linesRead+1):(lineCnt-1)
+% if we created the newText line, lineCnt will be negative
+for x = (linesRead+1):(abs(lineCnt)-1)
   textLine = fgetl(fid);
   fprintf(fidOut,'%s\r\n', textLine);
 end
-%old line - we're replacing this one but we need to read it so we can toss it.
-textLine = fgetl(fid);
-linesRead = linesRead + 1;
+if length(x)
+  linesRead = x;
+end
+% if we created the newText line, lineCnt will be negative
+%  so we are not replacing a line but inserting one!
+if (lineCnt > 0)
+  %old line - we're replacing this one but we need to read it so we can toss it.
+  textLine = fgetl(fid);
+  linesRead = linesRead + 1;
+end
 %insert the new line
 fprintf(fidOut,'%s\r\n', newText);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function  [textLine, Ndx] = updateRecvrInfo(recvrInfoList, b, outpostNmNValues, outpost, textLine, Ndx) ;
+% flag: when set, the modified field will include (sent: <sender info>)
+keepSent = 1;
+switch char(recvrInfoList(b))
+case 'OpCall'
+  d = outpostValByName('StationID', outpostNmNValues);
+case 'OpName'
+  d = outpostValByName('NameID', outpostNmNValues);
+case 'OpDate'
+  a = findstrchr(' ', outpost.dateTime);
+  d = outpost.dateTime(1:a-1);
+case 'OpTime'
+  a = findstrchr(':', outpost.time);
+  if a
+    d = strcat(outpost.time(1:a-1),outpost.time(a+1:length(outpost.time)));
+  else
+    d = outpost.time;
+  end
+case 'Rec-Sent'
+  d = 'Received' ;
+  keepSent = 0;
+otherwise
+  d = '';
+end %switch recvrInfoList(b)
+
+if length(d)
+  a = findstrchr('[', textLine);
+  b = findstrchr(']', textLine);
+  if keepSent
+    textLine = sprintf('%s%s (sent: %s)%s', textLine(1:a), d, textLine(a+1:b-1), textLine(b:length(textLine)) );
+  else % if keepSent
+    textLine = sprintf('%s%s%s', textLine(1:a), d, textLine(b:length(textLine)) );
+  end % if keepSent else
+end % if length(d)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

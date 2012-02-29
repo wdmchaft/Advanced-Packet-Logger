@@ -179,7 +179,14 @@ else
   errMsg = '';
 end
 
-Ndx = 1:size(coordOfGroup,1);
+Ndx = find(coordOfGroup(:, leftGrpNdx)>0);
+% if odd number of points & more than 2 points, we've got a box which means
+%   the last point is a duplication of the first point (to close the box).  We
+%   do not want to consider that point twice
+if mod(length(Ndx),2) & length(Ndx) > 2;
+  %remove the last point
+  Ndx = Ndx([1:length(Ndx)-1]);
+end
 newNdx = [];
 %need two points to define the edge
 while length(newNdx) < 2
@@ -188,7 +195,7 @@ while length(newNdx) < 2
   else
     a = min(coordOfGroup(Ndx, leftGrpNdx));
   end
-  aa = find(a==coordOfGroup(Ndx, leftGrpNdx));
+  aa = Ndx(find(a==coordOfGroup(Ndx, leftGrpNdx)));
   %remove the indice(s) that contain the min/max
   %  from the next search
   for itemp =1:length(aa)

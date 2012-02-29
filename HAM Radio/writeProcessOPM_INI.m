@@ -5,7 +5,13 @@ if err
   errMsg = sprintf('>%s%s', mfilename, errMsg);
   return
 end
-fprintf(fidINI, '%% This file establishes certain conditions for "processOutpostPacketMessages".\r\n');
+[pathstr,name,ext,versn] = fileparts(pathToINI) ;
+if length(name)
+  uFile = name;
+else
+  uFile = 'processOutpostPacketMessages';
+end
+fprintf(fidINI, '%% This file establishes certain conditions for "%s".\r\n', uFile);
 fprintf(fidINI, '%% Comment lines are any line that start with a space or % \r\n');
 fprintf(fidINI, '%% If this file did not exist when the program was run, it was written with\r\n');
 fprintf(fidINI, '%%  the program''s default values.  You may alter them as desired.\r\n');

@@ -1,4 +1,4 @@
-function [err, errMsg, msgList, fileInfo] = readOutpostMsgLog(msgLogPath, lastFileInfo);
+function [err, errMsg, msgList, fileInfo] = readOutpostMsgLog(msgLogPath, lastFileInfo, outpostNmNValues);
 %function [err, errMsg, msgList] = readOutpostMsgLog(msgLogPath);
 %Reads the entire "message.log" file and extracts the information
 %  into the msgList structure.  The dateTime element is in
@@ -73,13 +73,23 @@ if nargin < 2
 else
   readFullLog = 0;
 end
+if nargin < 3
+  [err, errMsg, outpostNmNValues] = OutpostINItoScript;
+end
 
 msgList = {};
+msgLogPath = endWithBackSlash(outpostValByName('DirLogs', outpostNmNValues));
+debug = 0;
+fid = fopen(sprintf('%s%s_debug.txt', outpostValByName('DirAddOnsPrgms', outpostNmNValues), mfilename),'r');
+if fid > 0
+  fclose(fid);
+  debug = 1;
+end
 
 if ~length(msgLogPath)
-  [err, errMsg, outpostNmNValues] = OutpostINItoScript;
   msgLogPath = endWithBackSlash(outpostValByName('DirLogs', outpostNmNValues));
 end
+
 msgLogPathName = strcat(msgLogPath, 'message.log');
 fid = fopen(msgLogPathName,'r');
 if (fid < 1)
@@ -103,10 +113,14 @@ fileInfo.fPos = 0 ;
 fileInfo.lastLine = '';
 fileInfo.msgLogVer = msgLogVer;
 
+if debug
+  fprintf('\nmessage.log #bytes: %i', fileInfo.bytes);
+end
+
 %if we've got info from last run
 if ~(readFullLog)
-  %smaller file forces readFullLog
-  readFullLog = (fileInfo.bytes < lastFileInfo.bytes);
+  %smaller file or nothing read previously forces readFullLog
+  readFullLog = ((fileInfo.bytes < lastFileInfo.bytes) | (lastFileInfo.bytes < 1));
   if ~(readFullLog)
     %hop to last location
     fseek(fid, lastFileInfo.fPos,'bof');
@@ -176,60 +190,75 @@ noFp = 1;
 while ~feof(fid)
   fPos = ftell(fid);
   textLine = fgetl(fid);
-  if ~length(textLine)
-    break
-  end
-  fileInfo.fPos = fPos;
-  fileInfo.lastLine = textLine;
-  Ndx = Ndx + 1;
-  delimAt = findstrchr('|', textLine);
-  [err, errMsg, msgList(Ndx).msgId] = extractFromCSVText(textLine, delimAt, msgIdAt);
-  [err, errMsg, a] = extractFromCSVText(textLine, delimAt, dateTimeAt);
-  msgList(Ndx).dateTime = a + offAdd;
-  [err, errMsg, msgList(Ndx).createRecv] = extractFromCSVText(textLine, delimAt, createRecvAt);
-  [err, errMsg, msgList(Ndx).action] = extractFromCSVText(textLine, delimAt, actionAt);
-  [err, errMsg, msgList(Ndx).bbs] = extractTextFromCSVNoQuote(textLine, delimAt, bbsAt);
-  [err, errMsg, msgList(Ndx).from] = extractTextFromCSVNoQuote(textLine, delimAt, fromAt);
-  [err, errMsg, msgList(Ndx).to] = extractTextFromCSVNoQuote(textLine, delimAt, toAt);
-  [err, errMsg, msgList(Ndx).msgSize] = extractFromCSVText(textLine, delimAt, msgSizeAt);
-  [err, errMsg, msgList(Ndx).subject] = extractTextFromCSVNoQuote(textLine, delimAt, subjectAt);
-  if 0
-    if findstrchr('RE: Solved! SNYEOC', msgList(Ndx).subject)
-      fprintf('ajskldaslj');
-    end
-  end
-  if msgLogVer < 1
-    msgList(Ndx).lmi = '';
-    msgList(Ndx).msgType = '';
-  else % if msgLogVer < 1
-    [err, errMsg, msgList(Ndx).lmi] = extractTextFromCSVNoQuote(textLine, delimAt, lmiAt);
-    % 1=Private, 2=NTS, 3=Bulletin
-    [err, errMsg, msgList(Ndx).msgType] = extractTextFromCSVNoQuote(textLine, delimAt, msgTypeAt);
-  end % if msgLogVer < 1 else
-  if (toc - lt) > 1 %  present status for long reads every 1 second
-    if noFp
-      %only display if still a long way to go
-      if (fileInfo.fPos/fileInfo.bytes < 0.5)
-        %first time: explain
-        colOut = fprintf('\nReading %s', msgLogPathName);
-        noFp = 0;
-      end %if (fileInfo.fPos/fileInfo.bytes > 0.5)
-    else % if noFp
-      % show % of file read
-      %  line long: roll it over
-      if colOut > 75
-        colOut = fprintf('...\n   ');
+  if isnumeric(textLine)
+    if (textLine == -1)
+      if debug
+        fprintf('\n #bytes read: %i', fPos);
+        fprintf('\n line read: %s', textLine);
+        fprintf('\nExiting!');
       end
-      %
-      colOut = colOut + fprintf(' %i%%', floor(100*fileInfo.fPos/fileInfo.bytes) );
-    end %if noFp else
-    lt = toc;
-  end %if (toc - lt) > 1 
+      break
+    end % if (textLine == -1)
+  end % if isnumeric(textLine)
+  if length(textLine) > 1
+    fileInfo.fPos = fPos;
+    fileInfo.lastLine = textLine;
+    Ndx = Ndx + 1;
+    delimAt = findstrchr('|', textLine);
+    [err, errMsg, msgList(Ndx).msgId] = extractFromCSVText(textLine, delimAt, msgIdAt);
+    [err, errMsg, a] = extractFromCSVText(textLine, delimAt, dateTimeAt);
+    msgList(Ndx).dateTime = a + offAdd;
+    [err, errMsg, msgList(Ndx).createRecv] = extractFromCSVText(textLine, delimAt, createRecvAt);
+    [err, errMsg, msgList(Ndx).action] = extractFromCSVText(textLine, delimAt, actionAt);
+    [err, errMsg, msgList(Ndx).bbs] = extractTextFromCSVNoQuote(textLine, delimAt, bbsAt);
+    [err, errMsg, msgList(Ndx).from] = extractTextFromCSVNoQuote(textLine, delimAt, fromAt);
+    [err, errMsg, msgList(Ndx).to] = extractTextFromCSVNoQuote(textLine, delimAt, toAt);
+    [err, errMsg, msgList(Ndx).msgSize] = extractFromCSVText(textLine, delimAt, msgSizeAt);
+    [err, errMsg, msgList(Ndx).subject] = extractTextFromCSVNoQuote(textLine, delimAt, subjectAt);
+    if 0
+      if findstrchr('RE: Solved! SNYEOC', msgList(Ndx).subject)
+        fprintf('ajskldaslj');
+      end
+    end
+    if msgLogVer < 1
+      msgList(Ndx).lmi = '';
+      msgList(Ndx).msgType = '';
+    else % if msgLogVer < 1
+      [err, errMsg, msgList(Ndx).lmi] = extractTextFromCSVNoQuote(textLine, delimAt, lmiAt);
+      % 1=Private, 2=NTS, 3=Bulletin
+      [err, errMsg, msgList(Ndx).msgType] = extractTextFromCSVNoQuote(textLine, delimAt, msgTypeAt);
+    end % if msgLogVer < 1 else
+    if (toc - lt) > 1 %  present status for long reads every 1 second
+      if noFp
+        %only display if still a long way to go
+        if (fileInfo.fPos/fileInfo.bytes < 0.5)
+          %first time: explain
+          colOut = fprintf('\nReading %s', msgLogPathName);
+          noFp = 0;
+        end %if (fileInfo.fPos/fileInfo.bytes > 0.5)
+      else % if noFp
+        % show % of file read
+        %  line long: roll it over
+        if colOut > 75
+          colOut = fprintf('...\n   ');
+        end
+        %
+        colOut = colOut + fprintf(' %i%%', floor(100*fileInfo.fPos/fileInfo.bytes) );
+      end %if noFp else
+      lt = toc;
+    end %if (toc - lt) > 1 
+  end % if length(textLine) > 1
 end
+totalBytes = ftell(fid);
 fcloseIfOpen(fid);
 %  final status for long reads
 if ~noFp
   fprintf(' 100%% - done!');
+end
+if debug
+  fprintf('\n last byte read: %i', totalBytes);
+  fprintf('\n last line read: %s', textLine);
+  fprintf('\nExiting!');
 end
 
 %  

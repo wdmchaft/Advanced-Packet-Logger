@@ -60,76 +60,36 @@ receivedFlag = (0 < findstrchr(lower('InTray'), lower(fpathName)));
 pathAddOns = outpostValByName('DirAddOns', outpostNmNValues);
 pathPrgms = outpostValByName('DirAddOnsPrgms', outpostNmNValues);
 printEnable = 3;
-printer.printEnable = 1;
+printerSetup.printEnable = 1;
 printMsg = printEnable;
 
-pathDirs.addOns = pathAddOns;
-pathDirs.addOnsPrgms = pathPrgms;
-pathDirs.DirPF = outpostValByName('DirPF', outpostNmNValues);
 fprintf('\n''%s''', fpathName);
 edit(fpathName)
 fprintf('\nOpening: %s', fpathName);
-fid = fopen(fpathName,'r');
-if fid<1
-  fprintf('\n Unable to open %s', fpathName);
-  return
-end
-[PACF, linesRead] = detectPacFORM(fid, 0, 100);
+[pathstr,name,ext,versn] = fileparts(fpathName)
+pname = endWithBackSlash(pathstr);
+fname = sprintf('%s%s', name, ext);
 
-if ~PACF
-  %not a PACForm
-  
-  % log as a "simple" message
-  form.type = 'Simple' ;
-  % % form.time = 'n/a';
-  if printMsg 
-    %the process of checking if PACF moved us within the file - restore
-    fseek(fid, fpPosition, 'bof');
-    [err, errMsg, printedNamePath, printedName] = printSimple(fid, fpathName, receivedFlag, pathDirs, printMsg, printer, form, outpost);
-  end  
-  % print (if enabled)
-else % if ~PACF
-  %This is a PACF:
-  [err, errMsg, pacfListNdx, thisForm, textLine] = getPACFType(fid);
-  fpPACPosition = ftell(fid);
-  %needs to be same order as List in "getPACFType"
-  switch pacfListNdx
-  case 1 % 'CITY-SCAN UPDATE FLASH REPORT'
-    [err, errMsg, printedName, printedNamePath, form] = cityScanFlash(fid, fpathName, receivedFlag, pathDirs, printMsg, printer, outpost);
-  case 2 % 'SC COUNTY LOGISTICS', ...
-    [err, errMsg, printedName, printedNamePath, form] = logisticsRequest(fid, fpathName, receivedFlag, pathDirs, printMsg, printer, outpost);
-  case 3 % 'EOC MESSAGE FORM',  ...
-    [err, errMsg, printedName, printedNamePath, form] = print_ICS_213(fid, fpathName, receivedFlag, pathDirs, printMsg, printer, outpost, outpostNmNValues);
-  case 4 % 'CITY MUTUAL AID REQUEST',  ...
-    [err, errMsg, printedName, printedNamePath, form] = cityMAR(fid, fpathName, receivedFlag, pathDirs, printMsg, printer, outpost);
-  case 5 % 'SHORT FORM HOSPITAL STATUS',  ...
-    [err, errMsg, printedName, printedNamePath, form] = shortHospitalStatus(fid, fpathName, receivedFlag, pathDirs, printMsg, printer, outpost);
-  case 6 % 'HOSPITAL STATUS',  (see also #10 which is the next version of this PacFORM)
-    [err, errMsg, printedName, printedNamePath, form] = doc9HospitalStatus(fid, fpathName, receivedFlag, pathDirs, printMsg, printer, outpost);
-  case 7 % 'HOSPITAL-BEDS',  ...
-    [err, errMsg, printedName, printedNamePath, form] = doc9BedStatus(fid, fpathName, receivedFlag, pathDirs, printMsg, printer, outpost);
-  case 8 % 'OES MISSION REQUEST',  ...  strcmp
-    [err, errMsg, printedName, printedNamePath, form] = oesMissionRequest(fid, fpathName, receivedFlag, pathDirs, printMsg, printer, outpost);
-  case 9 % 'SEMS SITUATION'
-    [err, errMsg, printedName, printedNamePath, form] = semsSitReport(fid, fpathName, receivedFlag, pathDirs, printMsg, printer, outpost, outpostNmNValues);
-  case 10 % FORM DOC-9 HOSPITAL-STATUS REPORT  (see also #6 which is the previous version of this PacFORM)
-    [err, errMsg, printedName, printedNamePath, form] = doc9HospitalStatusReport(fid, fpathName, receivedFlag, pathDirs, printMsg, printer, outpost);
-  case 11 % RESOURCE REQUEST FORM #9A
-    [err, errMsg, printedName, printedNamePath, form] = resourceRequestForm9A(fid, fpathName, receivedFlag, pathDirs, printMsg, printer, outpost, outpostNmNValues);
-  case 12 % 'FORM DOC-9 BEDS HOSPITAL-STATUS REPORT'
-    [err, errMsg, printedName, printedNamePath, form] = doc9bedsHospitalStatusReport(fid, fpathName, receivedFlag, pathDirs, printMsg, printer, outpost, outpostNmNValues);
-  otherwise
-    %form not in recognized list.  We'll log it even though we don;t know how to extract information from it
-    err = 0;
-  end % switch pacfListNdx
-  form.type = thisForm ;
-  if err
-    errMsg = strcat(mfilename, errMsg);
-    if (nargout < 1)
-      fprintf('Error: %i %s', err, errMsg);
-      clear err
-    end
-    break
-  end
-end % if ~PACF else
-fcloseIfOpen(fid);
+% %use the setup established for automatic printing:
+% [err, errMsg, printerSetup] = readPrintINI(outpostValByName('DirAddOns', outpostNmNValues), printerSetup, receivedFlag);
+% "printerSetup" structure 
+%   printerSetup.HPL3: numeric
+%   printerSetup.printerPort: string (eg LPT1:)
+%   printerSetup.copyList 
+%   printerSetup.printEnable: numeric
+%    0: printer disabled
+%    1: pre-printed form in printer & printer enabled. may be reset by the INI files - cannot be set by the INI file.
+%       i.e.: to print this passed in variable must be set AND if the INI file is found and has a value for print 
+%       enable, it must to set.  No printing will occur if the file doesn't exist, doesn't contain printEnable, 
+%       or if its value for printEnable is cleared.
+%    2: blank paper in printer, printer enable -> data will be loaded into form, printer 
+%       activated for <# of copies> (loaded from 'print_ICS_213.ini'), and the form will be closed.
+%    3: printer disabled, enable data displayed on screen
+%   printerSetup.numCopies 
+%   -1: print all in list [default]
+%    0: print none regardless of printEnable
+%   >0: print that many copies up but no more than in the list
+
+%printerSetup.printEnable = 2 ; printerSetup.numCopies = -1;
+[err, errMsg, outpostHdg, printed, form] ...
+  = processMessage(pname, fname, '', outpostNmNValues, printerSetup, receivedFlag);

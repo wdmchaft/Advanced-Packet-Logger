@@ -1,7 +1,7 @@
 function [figFillPos, figMenuNoBrd, figMenu] = screenSize(h_infig);
-%figFillPos: in pixels, position such that figure internal to fill screen
+%figFillPos: in same units as h_infig, position such that figure internal to fill screen
 %  without anything been hidden behind the Windows taskbar - no l/r borders
-%figMenuFit: in pixels, position that figure menu & title bar are also present
+%figMenuFit: position that figure menu & title bar are also present
 %figMenu: figure fits on screen including borders; 
 %          (5) = height of menu (pixels); 
 %          (6) = size of borders (a.k.a. frame) used l, r, b - top is menu
@@ -15,14 +15,16 @@ origUnits = get(h_fig, 'Units');
 %  the figure itself fills the wdith - not border
 %  the bottom will have a border but it is just above the Windows task bar - not extending behind
 set(h_fig, 'Units','normalized','Position',[0 0 1 1],'visible','off');
-set(h_fig, 'Units','pixels');
+%set the units to those of the passed-in figure:
+orig_infigUnits = get(h_infig, 'Units');
+set(h_fig, 'Units',orig_infigUnits);
 figFillPos = get(h_fig,'position');
 %the figure is more than full size so the following call
 %  results in an auto-fit where there are borders but the bottom
 %  extends to the bottom of the screen even though the Windows task bar is there
 movegui(h_fig,'northwest')
 posit = get(h_fig,'position');
-set(h_fig, 'Units', origUnits);
+
 positFull = get(0,'screensize');
 menuHi = positFull(4) - (posit(4) + posit(2)) - positFull(2);
 botBord = figFillPos(2) - 2*posit(2) + positFull(2) ;

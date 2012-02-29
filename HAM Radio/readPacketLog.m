@@ -24,8 +24,8 @@ function [err, errMsg, logged, header, columnHeader] = readPacketLog(pathName) ;
 %   logged.outpostDTime: date & time that outpost retrieved or sent the message
 %   logged(count).outpostPostTime: date & time the BBS received the message
 %   logged.formDTime: date & time recorded on the form (if any)
-%   logged.from: Outpost's sender info
-%   logged.to: Outpost's recipient(s) in terms of call sign(s) - not the form's "to"
+%   logged.from: Outpost's sender info converted to uppercase
+%   logged.to: Outpost's recipient(s) in terms of call sign(s) - not the form's "to" converted to uppercase
 %   logged.formType: type of message: simple for Outpost, PACF: as decribed in the form's heading
 %   logged.subject: Outpost's subject for message
 %   logged.isDelcrRecv: flag: 0=not delivery receipt; 1= delivery reciept.
@@ -150,10 +150,12 @@ while ~feof(fid)
       [err, errMsg, logged(count).xfrMsgNo] = extractStripQuotes(textLine, commasAt, column.xfrMsgNo) ;
       [err, errMsg, logged(count).bbs] = extractStripQuotes(upper(textLine), commasAt, column.bbs) ;
       [err, errMsg, logged(count).outpostDTime] = extractStripQuotes(textLine, commasAt, column.outpostLclTime) ;
-      [err, errMsg, logged(count).outpostPostTime] = extractStripQuotes(textLine, commasAt, column.outpostPostTime) ;
+      [err, errMsg, logged(count).outpostPostDTime] = extractStripQuotes(textLine, commasAt, column.outpostPostDTime) ;
       [err, errMsg, logged(count).formDTime] = extractStripQuotes(textLine, commasAt, column.formTime) ;
-      [err, errMsg, logged(count).from] = extractStripQuotes(upper(textLine), commasAt, column.from) ;
-      [err, errMsg, logged(count).to] = extractStripQuotes(upper(textLine), commasAt, column.to) ;
+      [err, errMsg, a] = extractStripQuotes(upper(textLine), commasAt, column.from) ;
+      logged(count).from = upper(a);
+      [err, errMsg, a] = extractStripQuotes(upper(textLine), commasAt, column.to) ;
+      logged(count).to = upper(a);
       [err, errMsg, logged(count).formType] = extractStripQuotes(textLine, commasAt, column.formType) ;
       [err, errMsg, logged(count).subject] = extractStripQuotes(textLine, commasAt, column.subject) ;
       logged(count).isDelcrRecv = findstrlen('DELIVERED:', logged(count).subject);
@@ -168,7 +170,7 @@ while ~feof(fid)
       logged(count).xfrMsgNo = '';
       logged(count).bbs = '';
       logged(count).outpostDTime = '';
-      logged(count).outpostPostTime = '';
+      logged(count).outpostPostDTime = '';
       logged(count).formDTime = '';
       logged(count).from = '';
       logged(count).to = '';

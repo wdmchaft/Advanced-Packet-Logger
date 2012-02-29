@@ -1,5 +1,5 @@
-function [err, errMsg, printedName, printedNamePath, form] = print_ICS_213(fid, fname, receivedFlag, pathDirs, printEnable, printer, outpost, outpostNmNValues, h_field);
-%function [err, errMsg, printedName, printedNamePath] = print_ICS_213(fid, fname, receivedFlag, PathConfig);
+function [err, errMsg, printed, form] = print_ICS_213(fid, fname, receivedFlag, pathDirs, printer, outpostHdg, outpostNmNValues, h_field);
+%function [err, errMsg, printed] = print_ICS_213(fid, fname, receivedFlag, PathConfig);
 % Continues to read the open text file which has been identified as 
 %containing an ICS213 'PACForms' format message.
 % Extracts the information desired for the Packet Log (into the structure "form") and
@@ -40,8 +40,9 @@ function [err, errMsg, printedName, printedNamePath, form] = print_ICS_213(fid, 
 %OUTPUT:
 % err: 0 when no errors detected; non-zero otherwise.
 % errMsg: empty string when no error; error message and calling "stack" modName>modName: error message
-% printedName: name of the file created by this module - this is a subset of the "printedNamePath" variable.
-% printedNamePath: path & name of the file created by this module.
+% printed.Name: name of the file created by this module - this is a subset of the "printedNamePath" variable.
+% printed.NamePath: path & name of the file created by this module.
+% printed.Date: date & time the printed was performed.
 %
 %SUPPORT MODULES & FILES - all files expected in 'PathConfig'
 % loadICS213FormPositions: loads the physical locations of the fields for the pre-printed
@@ -77,12 +78,9 @@ function [err, errMsg, printedName, printedNamePath, form] = print_ICS_213(fid, 
 %This module will skip ahead & start processing the message with the line after
 % # Answers are enclosed in brackets
 
-[err, errMsg, modName, form, printedName, printedNamePath, printEnable, copyList, numCopies, ...
-    formField, h_field, textLine, fieldsFound, spaces, textToPrint]...
-  = startReadPACF(mfilename, receivedFlag, pathDirs, printEnable, 'ICS213', fname, fid);
-
-addressee = '';
-originator = '';
+[err, errMsg, modName, form, printed, printer ...
+    formField, h_field, textLine, fieldsFound, spaces, textToPrint, addressee, originator]...
+  = startReadPACF(mfilename, receivedFlag, pathDirs, printer, 'ICS213', fname, fid, outpostHdg);
 
 while 1 % read & detect the field for each line of the entire message
   % clear the print line so the line will not be altered unless the field
@@ -142,26 +140,26 @@ while 1 % read & detect the field for each line of the entire message
     fieldsFound = fieldsFound + 1;
   otherwise
   end
-  if printEnable
+  if printer.printEnable
     %#IFDEF debugOnly
     if strcmp(fieldID,'12.')
       fprintf('IDE (debug): Message Field found in %s', mfilename);
     end
     %#ENDIF
     [err, errMsg, textToPrint, h_field, formField, moveNeeded] = fillFormField(fieldID, fieldText, formField, h_field, textToPrint, spaces, outpostNmNValues);
-  else %if printEnable
+  else %if printer.printEnable
     %not printing - exit when we've extracted all we need
     if fieldsFound > 11
       break
     end
-  end % if printEnable else
+  end % if printer.printEnable else
   textLine = fgetl(fid);
 end % while 1 % read & detect the field for each line of the entire message
 
 fcloseIfOpen(fid);
 
-if (~err & printEnable)
-  [err, errMsg, printedNamePath, printedName] = ...
-    formFooterPrint(printer, printEnable, copyList, numCopies, h_field, formField, fname, originator, addressee, textToPrint, outpost, receivedFlag);
-end % if (~err & printEnable)
+if (~err & printer.printEnable)
+  [err, errMsg, printed] = ...
+    formFooterPrint(printer, h_field, formField, fname, originator, addressee, textToPrint, outpostHdg, receivedFlag);
+end % if (~err & printer.printEnable)
 

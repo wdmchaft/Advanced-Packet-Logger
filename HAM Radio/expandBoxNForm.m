@@ -63,7 +63,7 @@ if ~length(headerNdx)
   %find the box which has its top the highest on the page
   highestNdx = find(topAll == max(topAll));
   %find any other boxes with tops above the bottom of the highest box
-  headerNdx = find(topAll > botAll(highestNdx));
+  headerNdx = find(topAll > botAll(highestNdx(1)));
 end
 
 footerNdx = find( ismember({formField(thisPage,:).digitizedName}, 'Footer') );

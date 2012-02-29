@@ -7,7 +7,7 @@ function [codeVersion, reply] = about_displayCounts_private()
 
 codeVersion = 0.000000;
 if codeVersion
-  reply = sprintf('displayCounts Version %.3f (Debug) created 22-Feb-2011 21:14:49.', codeVersion);
+  reply = sprintf('displayCounts Version %.3f (Debug) created 12-Jan-2012 12:51:11.', codeVersion);
 else % if codeVersion
-  reply = sprintf('displayCounts created  (Debug)22-Feb-2011 21:14:49.');
+  reply = sprintf('displayCounts created  (Debug)12-Jan-2012 12:51:11.');
 end % if codeVersion

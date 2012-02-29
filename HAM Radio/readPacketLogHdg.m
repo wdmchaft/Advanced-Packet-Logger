@@ -2,7 +2,7 @@ function [column, version] = readPacketLogHdg(columnHeader);
 
 column.xfrMsgNo	= -1;
 column.lclMsgNo = -1;
-column.outpostPostTime = -1;
+column.outpostPostDTime = -1;
 column.bbs = -1;
 column.outpostLclTime = -1;
 column.formTime = -1;
@@ -33,7 +33,7 @@ else
   version = 1;
   [err, errMsg, column.lclMsgNo] = findColumnOfData(columnHeader, 'LOCAL MSG #', commasAt);
 end
-[err, errMsg, column.outpostPostTime] = findColumnOfData(columnHeader, 'OUTPOST POST TIME', commasAt);
+[err, errMsg, column.outpostPostDTime] = findColumnOfData(columnHeader, 'OUTPOST POST TIME', commasAt);
 if ~err
   version = 2;
 end

@@ -1,4 +1,4 @@
-function [err, errMsg, printedName, printedNamePath, form] = doc9bedsHospitalStatusReport(fid, msgFname, receivedFlag, pathDirs, printEnable, printer, outpost, outpostNmNValues);
+function [err, errMsg, printed, form] = doc9bedsHospitalStatusReport(fid, msgFname, receivedFlag, pathDirs, printer, outpostHdg, outpostNmNValues);
 
 %used for the 03-30-10 & later version
 % for earlier, "doc9BedStatus" is used
@@ -26,9 +26,9 @@ function [err, errMsg, printedName, printedNamePath, form] = doc9bedsHospitalSta
 % stat: [1]
 % 
 
-[err, errMsg, modName, form, printedName, printedNamePath, printEnable, copyList, numCopies, ...
+[err, errMsg, modName, form, printed, printer ...
     formField, h_field, textLine, fieldsFound, spaces, textToPrint]...
-  = startReadPACF(mfilename, receivedFlag, pathDirs, printEnable, 'Hospital-Beds Status Report', msgFname, fid);
+  = startReadPACF(mfilename, receivedFlag, pathDirs, printer, 'Hospital-Beds Status Report', msgFname, fid, outpostHdg);
 
 addressee = '';
 originator = '';
@@ -97,21 +97,21 @@ while 1 % read & detect the field for each line of the entire message
     originator = fT;
   otherwise
   end
-  if printEnable
+  if printer.printEnable
     [err, errMsg, textToPrint, h_field, formField, moveNeeded] = fillFormField(fieldID, fieldText, formField, h_field, textToPrint, spaces, outpostNmNValues);
-  else %if printEnable
+  else %if printer.printEnable
     %not printing - exit when we've extracted all we need
     if fieldsFound > 11
       break
     end
-  end % if printEnable else
+  end % if printer.printEnable else
   
   textLine = fgetl(fid);
 end % while 1 % read & detect the field for each line of the entire message
 
 fcloseIfOpen(fid);
 
-if (~err & printEnable)
-  [err, errMsg, printedNamePath, printedName] = ...
-    formFooterPrint(printer, printEnable, copyList, numCopies, h_field, formField, msgFname, originator, addressee, textToPrint, outpost, receivedFlag);
-end % if (~err & printEnable)
+if (~err & printer.printEnable)
+  [err, errMsg, printed] = ...
+    formFooterPrint(printer, h_field, formField, msgFname, originator, addressee, textToPrint, outpostHdg, receivedFlag);
+end % if (~err & printer.printEnable)

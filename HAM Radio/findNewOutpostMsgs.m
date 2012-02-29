@@ -248,10 +248,11 @@ end % if fid>0  fid = fopen(nmNewText,'r'); else
 %if we loaded the MAT file (contains the 'fileInfo" from earlier) and we read the time of the latest message we'd found
 if (fid_nmStore >0) & latesTmRead
   %read the message.log file giving it the information from the last read for faster updating
-  [err, errMsg, msgList, fileInfo] = readOutpostMsgLog(msgLogPath, fileInfo);
+  [err, errMsg, msgList, fileInfo] = readOutpostMsgLog(msgLogPath, fileInfo, outpostNmNValues);
 else %if (fid_nmStore >0) & latesTmRead
   %read the message.log file from the beginning
-  [err, errMsg, msgList, fileInfo] = readOutpostMsgLog(msgLogPath);
+  a.bytes = 0;
+  [err, errMsg, msgList, fileInfo] = readOutpostMsgLog(msgLogPath, a, outpostNmNValues);
 end %if (fid_nmStore >0) & latesTmRead
 
 if err

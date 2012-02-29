@@ -1,4 +1,4 @@
-function [form, printedName, printedNamePath] = clearFormInfo;
+function [form, printed] = clearFormInfo;
 form.senderMsgNum = '';
 form.receiverMsgNum = '';  %don't know how packet will use this but it is on the forms
 form.MsgNum = '';
@@ -11,6 +11,8 @@ form.replyWhen = '';
 form.type = '';
 form.sitSevere = '' ;
 form.handleOrder = '' ;
+form.xfrNum = '';
 
-printedName = ''; 
-printedNamePath = ''; 
+printed.NamePath = ''; 
+printed.Name = '' ;
+printed.Date = '';

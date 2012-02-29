@@ -1,4 +1,4 @@
-function [err, errMsg, printedName, printedNamePath, form] = semsSitReport(fid, msgFname, receivedFlag, pathDirs, printMsg, printer, outpost, outpostNmNValues, h_field);
+function [err, errMsg, printed, form] = semsSitReport(fid, msgFname, receivedFlag, pathDirs, printer, outpostHdg, outpostNmNValues, h_field);
 
 % !PACF!
 % # SEMS SITUATION REPORT 
@@ -97,13 +97,9 @@ function [err, errMsg, printedName, printedNamePath, form] = semsSitReport(fid, 
 % 45.: [Supporting File(s): Web Pages]
 % #EOF
 
-[err, errMsg, modName, form, printedName, printedNamePath, printEnable, copyList, numCopies, ...
-    formField, h_field, textLine, fieldsFound, spaces, textToPrint]...
-  = startReadPACF(mfilename, receivedFlag, pathDirs, printMsg, 'RIMS SITUATION REPORT', msgFname, fid);
-
-addressee = '';
-originator = '';
-
+[err, errMsg, modName, form, printed, printer ...
+    formField, h_field, textLine, fieldsFound, spaces, textToPrint, addressee, originator]...
+  = startReadPACF(mfilename, receivedFlag, pathDirs, printer, 'RIMS SITUATION REPORT', msgFname, fid, outpostHdg);
 while 1 % read & detect the field for each line of the entire message
   if (1 == findstrchr(textLine, '#EOF'))
     break
@@ -155,9 +151,9 @@ while 1 % read & detect the field for each line of the entire message
     fieldsFound = fieldsFound + 1;
   otherwise
   end
-  if printEnable
+  if printer.printEnable
     [err, errMsg, textToPrint, h_field, formField, moveNeeded] = fillFormField(fieldID, fieldText, formField, h_field, textToPrint, spaces, outpostNmNValues);
-  else %if printEnable
+  else %if printer.printEnable
     %not printing - exit when we've extracted all we need
     if fieldsFound > 10
       break
@@ -169,7 +165,7 @@ end % while 1 % read & detect the field for each line of the entire message
 
 fcloseIfOpen(fid);
 
-if (~err & printEnable)
-  [err, errMsg, printedNamePath, printedName] = ...
-    formFooterPrint(printer, printEnable, copyList, numCopies, h_field, formField, msgFname, originator, addressee, textToPrint, outpost, receivedFlag);
+if (~err & printer.printEnable)
+  [err, errMsg, printed] = ...
+    formFooterPrint(printer, h_field, formField, msgFname, originator, addressee, textToPrint, outpostHdg, receivedFlag);
 end % if (~err & printEnable)

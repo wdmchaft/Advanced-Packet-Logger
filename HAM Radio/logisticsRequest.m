@@ -1,4 +1,4 @@
-function [err, errMsg, printedName, printedNamePath, form] = logisticsRequest(fid, msgFname, receivedFlag, pathDirs, printMsg, printer, outpost, h_field);
+function [err, errMsg, printed, form] = logisticsRequest(fid, msgFname, receivedFlag, pathDirs, printer, outpostHdg, h_field);
 
 % !PACF!
 % # SC COUNTY LOGISTICS REQUEST FORM
@@ -30,12 +30,9 @@ function [err, errMsg, printedName, printedNamePath, form] = logisticsRequest(fi
 % 34.: [finance remarks]
 % #EOF
 
-[err, errMsg, modName, form, printedName, printedNamePath, printEnable, copyList, numCopies, ...
-    formField, h_field, textLine, fieldsFound, spaces, textToPrint]...
-  = startReadPACF(mfilename, receivedFlag, pathDirs, printMsg, 'scLogisticsReq', msgFname, fid);
-
-addressee = '';
-originator = '';
+[err, errMsg, modName, form, printed, printer ...
+    formField, h_field, textLine, fieldsFound, spaces, textToPrint, addressee, originator]...
+  = startReadPACF(mfilename, receivedFlag, pathDirs, printer, 'scLogisticsReq', msgFname, fid, outpostHdg);
 
 while 1 % read & detect the field for each line of the entire message
   % clear the print line so the line will not be altered unless the field
@@ -55,7 +52,7 @@ while 1 % read & detect the field for each line of the entire message
   %ID/names as contained within the Outpost form of the message
   switch fieldID
   case {'1.', '2.'} % Priority, requesting agency 
-    form.subject = sprintf('%s %s;', form.subject, fieldText);
+    form.subject = multiField('', form.subject, fieldText);
     %two calls here!
     fieldsFound = fieldsFound + 1;
   case '7.'
@@ -64,14 +61,20 @@ while 1 % read & detect the field for each line of the entire message
     fieldsFound = fieldsFound + 1;
   case '8.' 
     %this is the incident number
+    form.comment = sprintf('%s Lcl Incident # %s', form.comment, fieldText);
+    fieldsFound = fieldsFound + 1;
+  case '9.' 
+    %this is the incident number
+    form.comment = sprintf('%s Lcl Rqst # %s', form.comment, fieldText);
     fieldsFound = fieldsFound + 1;
   case '14.' % when
-    form.replyWhen = sprintf('Needed %s', fieldText) ;
+    form.replyWhen = multiField('Needed', form.replyWhen, fieldText);
     fieldsFound = fieldsFound + 1;
   case 'A.'
     form.senderMsgNum = fieldText ;
     fieldsFound = fieldsFound + 1;
   case 'MsgNo'
+    %     form.MsgNum = multiField('Msg #', form.MsgNum, fieldText);
     form.MsgNum = fieldText ;
     fieldsFound = fieldsFound + 1;
   case 'C.'
@@ -87,19 +90,19 @@ while 1 % read & detect the field for each line of the entire message
     form.replyReq = fieldText; 
     fieldsFound = fieldsFound + 1;
   case 'replyby'
-    form.replyWhen = fieldText ;
+    form.replyWhen = multiField('Reply by', form.replyWhen, fieldText);
     fieldsFound = fieldsFound + 1;
   case '3.'
     %only used if printing is enabled so 'fieldsFound' isn't incremented
     originator = fieldText ;
   otherwise
   end
-  if printEnable 
+  if printer.printEnable 
     [err, errMsg, textToPrint] = fillFormField(fieldID, fieldText, formField, h_field, '', '') ;
-  else % if printMsg 
+  else % if printer.printEnable 
     %If we are not printing and we've found all the desired fields
     %  presuming each fieldID occurs only once in the message
-    if (fieldsFound > 11)
+    if (fieldsFound > 12)
       break
     end
   end % if printMsg else
@@ -107,8 +110,8 @@ while 1 % read & detect the field for each line of the entire message
 end % while 1 % read & detect the field for each line of the entire message
 
 fcloseIfOpen(fid);
-addressee = 'Planning';
-if (~err & printEnable)
-  [err, errMsg, printedNamePath, printedName] = ...
-    formFooterPrint(printer, printEnable, copyList, numCopies, h_field, formField, msgFname, originator, addressee, textToPrint, outpost, receivedFlag);
-end % if (~err & printEnable)
+if (~err & printer.printEnable)
+  addressee = 'Planning';
+  [err, errMsg, printed] = ...
+    formFooterPrint(printer, h_field, formField, msgFname, originator, addressee, textToPrint, outpostHdg, receivedFlag);
+end % if (~err & printer.printEnable)

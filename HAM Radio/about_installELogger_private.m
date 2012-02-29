@@ -7,7 +7,7 @@ function [codeVersion, reply] = about_installELogger_private()
 
 codeVersion = 0.000000;
 if codeVersion
-  reply = sprintf('installELogger Version %.3f (Debug) created 21-Jan-2011 09:43:12.', codeVersion);
+  reply = sprintf('installELogger Version %.3f (Debug) created 12-Jan-2012 11:37:35.', codeVersion);
 else % if codeVersion
-  reply = sprintf('installELogger created  (Debug)21-Jan-2011 09:43:12.');
+  reply = sprintf('installELogger created  (Debug)12-Jan-2012 11:37:35.');
 end % if codeVersion

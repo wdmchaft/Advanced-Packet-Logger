@@ -3,7 +3,7 @@ function compareOutpostINI
 [err, errMsg, outpostNmNValues] = OutpostINItoScript; 
 dirOutpost = endWithBackSlash(outpostValByName('DirOutpost', outpostNmNValues));
 
-fidOrig = fopen(strcat(dirOutpost,'outpost_orig.ini'),'r');
+fidOrig = fopen(strcat(dirOutpost,'outpost_preChange.ini'),'r');
 fidCurrent = fopen(strcat(dirOutpost,'outpost.ini'),'r');
 while ~feof(fidOrig) & ~feof(fidCurrent)
   textLineOrig = fgetl(fidOrig);
@@ -14,6 +14,7 @@ while ~feof(fidOrig) & ~feof(fidCurrent)
 end
 fclose(fidOrig);
 fclose(fidCurrent);
+dos(sprintf('copy "%soutpost.ini" "%soutpost_preChange.ini"', dirOutpost, dirOutpost));
 
 % GetPrivate=1 -> retrieve private messages (0/1)
 % GetNts=1 retreive NTS messages (0/1)
@@ -50,3 +51,11 @@ fclose(fidCurrent);
 
 %Tools/Report
 %TacID=SEP
+
+%Outbound message number: AutoMsgNum
+%Incoming message number: LMIflag
+
+%New message set up
+% NewMsgDefault=0   default to PRIVATE
+% to
+% NewMsgDefault=1   default to BULLETIN 

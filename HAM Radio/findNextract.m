@@ -42,7 +42,7 @@ foundFlg = 0;
 % was done out of sequentional order per the INI file.  We'll try a second time from the beginning
 for retry = 0:1
   textLine = '';
-  while ~(1==findstrchr(textLine, key)) & ~feof(fid)
+  while ~any(1==findstrchr(textLine, key)) & ~feof(fid)
     textLine = fgetl(fid);
   end
   if feof(fid) & ~findstrchr(textLine, key)
@@ -50,16 +50,16 @@ for retry = 0:1
     fseek(fid, 0, 'bof');
   else % if feof(fid) & ~length(textLine)
     %the key must start the line
-    if (1 == findstrchr(textLine, key))
+    if any(1 == findstrchr(textLine, key))
       [var, foundFlg] = afterEqual(textLine);
       %if this is a directory declaration, make sure it is \ terminated
       if (findstrchr('Dir', key) == 1) & foundFlg
         var = endWithBackSlash(var);
-      end
-    else
+      end 
+    else % if any(1 == findstrchr(textLine, key))
       var = '';
       foundFlg = 0;
-    end
+    end % if any(1 == findstrchr(textLine, key)) else
     %when found, break out of the retry loop
     break;
   end %  if feof(fid) & ~length(textLine) else

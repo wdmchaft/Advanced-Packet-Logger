@@ -28,95 +28,120 @@ function varargout = showForm(varargin)
 err = 0;
 errMsg = '';
 figure1 = 0 ;
+
 if nargin == 0  % LAUNCH GUI
-  [err, errMsg, figure1, h_field] = showForm_OpeningFcn;
+  [varargout{1:nargout}] = showForm_OpeningFcn;
 elseif nargin < 4 % LAUNCH GUI and pass path or path\name
-  [err, errMsg, h_field, formField, figPosition] = showForm_OpeningFcn(varargin{:});
+  try
+    % [err, errMsg, h_field, formField, figPosition] = showForm_OpeningFcn(varargin{:});
+    [varargout{1:nargout}] = showForm_OpeningFcn(varargin{:});
+  catch
+    fid = fopen('C:\ProgramData\SCCo Packet\AddOns\Programs\debug.log', 'a');
+    [err_1, errMsg_1, date_time, prettyDateTime, Yr, Mo, Da] = datevec2timeStamp(now);
+    fprintf('\r\nshowForm %s error: %s ', date_time, lasterr);
+    if fid > 0
+      %to file
+      fprintf(fid, '\r\nshowForm %s error: %s ', date_time, lasterr);
+      fopen(fid);
+    else
+      fprintf('\nunable to open debug.log');
+    end
+  end % try/catch
 elseif ischar(varargin{1}) % INVOKE NAMED SUBFUNCTION OR CALLBACK
   err = 0;
-  try
-    if (nargout)
-      [varargout{1:nargout}] = feval(varargin{:}); % FEVAL switchyard
-    else
-      feval(varargin{:}); % FEVAL switchyard
-    end
-  catch
-    err = 1;
-  end %try
-  if findstrchr('Invalid function name', lasterr)
+  if findstrchr(varargin{1},'_Callback')
     try
-      [err, errMsg, h_field, formField, figPosition] = showForm_OpeningFcn(varargin{:});
+      if (nargout)
+        [varargout{1:nargout}] = feval(varargin{:}); % FEVAL switchyard
+      else
+        feval(varargin{:}); % FEVAL switchyard
+      end
     catch
-    end
-  end
-  %This "if" provides a method of passing parameters to "showForm_OpeningFcn".  It responds
-  %  when the program has been called but not in response to a user activity on the GUI.
-  if err
-    lastErr = lasterr;
-    %if the caller was trying to pass parameters, we'll get this error
-    % alone.  However a coding error, example with "Ndx" causes "Undefined function or variable 'Ndx'."
-    %That is a real error and we do not want to try again!
-    f1 = findstr(lastErr,'Undefined function') & ~findstr(lastErr,'or variable');
-    %if something, make sure not 0/false
-    if ~isempty(f1)
-      %if zero, reset to null so tests following operate
-      if ~f1
-        f1 = [];
-      end
-    end
-    if isempty(f1)
-      f1 = findstr(lastErr,'Invalid function');
-    end
-    if isempty(f1)
-      f1 = findstr(lastErr,'Reference to unknown function') & findstr(lastErr,'in stand-alone mode');
-    end
-    if ~isempty(f1)
-      %let's try to set the properties
+      err = 1;
+    end %try
+    if findstrchr('Invalid function name', lasterr)
       try
-        %err, errMsg, h_field, formField, figPosition
-        [err, errMsg, h_field, formField, figPosition] = showForm_OpeningFcn(varargin{:}) ;
+        % [err, errMsg, h_field, formField, figPosition] = showForm_OpeningFcn(varargin{:});
+        [varargout{1:nargout}] = showForm_OpeningFcn(varargin{:});
       catch
-        % disp(lasterr);
-        fprintf('\r\n%s while attempting showForm_OpeningFcn with %s', lasterr, varargin{1});
       end
-    else % if ~isempty(f1)
-      %was not the 'Undefined function' error message - report the error
-      errMsg = sprintf('%s while attempting %s', lasterr, varargin{1});
-      fprintf('\r\n%s', errMsg);
-    end %if ~isempty(f1)else
-  end % if err
+    end
+    %This "if" provides a method of passing parameters to "showForm_OpeningFcn".  It responds
+    %  when the program has been called but not in response to a user activity on the GUI.
+    if err
+      lastErr = lasterr;
+      %if the caller was trying to pass parameters, we'll get this error
+      % alone.  However a coding error, example with "Ndx" causes "Undefined function or variable 'Ndx'."
+      %That is a real error and we do not want to try again!
+      f1 = findstr(lastErr,'Undefined function') & ~findstr(lastErr,'or variable');
+      %if something, make sure not 0/false
+      if ~isempty(f1)
+        %if zero, reset to null so tests following operate
+        if ~f1
+          f1 = [];
+        end
+      end
+      if isempty(f1)
+        f1 = findstr(lastErr,'Invalid function');
+      end
+      if isempty(f1)
+        f1 = findstr(lastErr,'Reference to unknown function') & findstr(lastErr,'in stand-alone mode');
+      end
+      if ~isempty(f1)
+        %let's try to set the properties
+        try
+          %err, errMsg, h_field, formField, figPosition
+          % [err, errMsg, h_field, formField, figPosition] = showForm_OpeningFcn(varargin{:}) ;
+          [varargout{1:nargout}] = showForm_OpeningFcn(varargin{:}) ;
+        catch
+          % disp(lasterr);
+          fprintf('\r\n%s while attempting showForm_OpeningFcn with %s', lasterr, varargin{1});
+        end
+      else % if ~isempty(f1)
+        %was not the 'Undefined function' error message - report the error
+        errMsg = sprintf('%s while attempting %s', lasterr, varargin{1});
+        fprintf('\r\n%s', errMsg);
+        if nargout > 1
+          varargout{2} = errMsg;
+        end
+      end %if ~isempty(f1)else
+    end % if err
+  else % if findstrchr(varargin{1},'_Callback')
+    [varargout{1:nargout}] = showForm_OpeningFcn(varargin{:}) ;
+  end % if findstrchr(varargin{1},'_Callback') else
 end % if nargin == 0 elseif ischar(varargin{1})
-if err
-  fprintf('\nErr %i, err msg %s', err, errMsg);
+if varargout{1}
+  fprintf('\nErr %i, err msg %s', varargout{1}, varargout{2});
 end
 switch nargout
 case 0
   %#IFDEF debugOnly
   % these only work in IDE... which is also the only time we want them!
-  assignin('base', 'err', err);
-  assignin('base', 'errMsg', errMsg);
-  assignin('base', 'h_field', h_field);
-  assignin('base', 'formField', formField);
+  assignin('base', 'err', varargout{1});
+  assignin('base', 'errMsg', varargout{2});
+  assignin('base', 'h_field', varargout{3});
+  assignin('base', 'formField', varargout{4});
   assignin('base', 'handles', guidata(h_field(length(h_field))) );
   %#ENDIF
-case 1
-  varargout{1} = figure1 ;
-case 2
-case 3
-  varargout{1} = err;
-  varargout{2} = errMsg;
-  varargout{3} = h_field ;
-case 4
-  varargout{1} = err;
-  varargout{2} = errMsg;
-  varargout{3} = h_field ;
-  varargout{4} = formField ;
-case 5
-  varargout{1} = err;
-  varargout{2} = errMsg;
-  varargout{3} = h_field ;
-  varargout{4} = formField ;
-  varargout{5} = figPosition;
+% case 1
+%   varargout{1} = figure1 ;
+% case 2
+% case 3
+%   varargout{1} = err;
+%   varargout{2} = errMsg;
+%   varargout{3} = h_field ;
+% case 4
+%   varargout{1} = err;
+%   varargout{2} = errMsg;
+%   varargout{3} = h_field ;
+%   varargout{4} = formField ;
+% case 5
+%   varargout = {};
+%   varargout{1} = err;
+%   varargout{2} = errMsg;
+%   varargout{3} = h_field ;
+%   varargout{4} = formField ;
+%   varargout{5} = figPosition;
 otherwise
 end
 % --------------------------------------------------------------------
@@ -171,6 +196,7 @@ guidata(fig, handles);
 set(handles.figure1,'units','pixels');
 origHidden = get(0,'ShowHiddenHandles');
 set(0,'ShowHiddenHandles','on')
+figPosition = 0;
 if nargin
   %path and name with extension of image file
   fPathNameExt = varargin{1};
@@ -186,8 +212,6 @@ if nargin
   formField = varargin{3};
   if nargin > 3
     figPosition = varargin{4};
-  else
-    figPosition = 0;
   end
 else
   %   [err, errMsg, outpostNmNValues] = OutpostINItoScript; 
@@ -291,7 +315,6 @@ if length(fPathNameExt)
   % % % retain the aspect ratio of the jpeg...
   % % set(gca, 'DataAspectRatio',[1,1, 1])
   
-  set(0,'ShowHiddenHandles', origHidden)
   load(strcat(pathstrImage,'grayMap'))
   set(handles.figure1,'colormap', grayMap)
   
@@ -302,6 +325,7 @@ if length(fPathNameExt)
 else %if length(fPathNameExt) 
   [h_field, formField] = createSimpleForm(handles);
 end % if length(fPathNameExt) if length(fPathNameExt) else
+set(0,'ShowHiddenHandles', origHidden)
 h_field(length(h_field)+1) = handles.figure1;
 
 guidata(handles.figure1, handles);
@@ -313,6 +337,10 @@ varargout{5} = get(handles.figure1,'Position');
 % --------------------------------------------------------------------
 function [h_field] = fieldsOnForm(field, handles)
 debugFlag = 0;
+%#IFDEF debugOnly
+% debugFlag = 1;
+%#ENDIF
+
 %pre-size the array.  Note: if a multiple page form
 % & this page has fewer fields than another page, 
 % h_field will have entries with value of zero.
@@ -484,13 +512,15 @@ formField(fieldNdx).VertJust = 'Vtop';
 posit(1) = brder;
 % full width
 posit(3) = positFig1(3);
-% figure bottom
-posit(2) = brder + positFooter(2) + positFooter(4);
-% available height
-posit(4) = positAbove(2) - 2 * brder - posit(2);
+% % % figure bottom
+% % posit(2) = brder + positFooter(2) + positFooter(4);
+posit(2) = positAbove(2) - 4 * brder;
+% % % available height
+% % posit(4) = positAbove(2) - 2 * brder - posit(2);
+posit(4) = 2 * brder ;
 fieldNdx = length(h_field) + 1;
-h_field(fieldNdx) = uicontrol('Style', 'frame', 'parent', handles.figure1,'position', posit);
-formField(fieldNdx).digitizedName = 'frame';
+h_field(fieldNdx) = uicontrol('Style', 'frame', 'parent', handles.figure1,'position', posit, 'BackgroundColor',[1 1 1]);
+formField(fieldNdx).digitizedName = 'frameTop';
 formField(fieldNdx).lftTopRhtBtm = posit;
 formField(fieldNdx).PACFormTagPrimary = formField(fieldNdx).digitizedName;
 formField(fieldNdx).PACFormTagSecondary = '';
@@ -503,9 +533,11 @@ posit(1) = brder + posit(1);
 % width
 posit(3) = posit(3) - 2 * brder;
 % figure bottom
-posit(2) = posit(2) + brder ;
+% % posit(2) = posit(2) + brder ;
+posit(2) = brder + positFooter(2) + positFooter(4);
 % available height
-posit(4) = posit(4) - 2 * brder;
+% % posit(4) = posit(4) - 2 * brder;
+posit(4) = positAbove(2) - 4 * brder - posit(2);
 fieldNdx = length(h_field) + 1;
 h_field(fieldNdx) = uicontrol(opts, 'position', posit);
 formField(fieldNdx).digitizedName = 'message';
@@ -515,12 +547,23 @@ formField(fieldNdx).PACFormTagSecondary = '';
 formField(fieldNdx).HorizonJust = 'Hleft';
 formField(fieldNdx).VertJust = 'Vtop';
 
+posit(2) = positFooter(2) + positFooter(4);
+posit(4) = brder;
+fieldNdx = length(h_field) + 1;
+h_field(fieldNdx) = uicontrol('Style', 'frame', 'parent', handles.figure1,'position', posit, 'BackgroundColor',[1 1 1]);
+formField(fieldNdx).digitizedName = 'frameBtm';
+formField(fieldNdx).lftTopRhtBtm = posit;
+formField(fieldNdx).PACFormTagPrimary = formField(fieldNdx).digitizedName;
+formField(fieldNdx).PACFormTagSecondary = '';
+formField(fieldNdx).HorizonJust = '';
+formField(fieldNdx).VertJust = '';
+
 for itemp =1:fieldNdx
   set(h_field(itemp),'units','normalized', 'String', '');
 end
-
-set(handles.figure1, 'units', origUnits, 'Color', [1 1 1]);
-% --------------------------------------------------------------------
+ud.formType = 'simple'
+set(handles.figure1, 'units', origUnits, 'Color', [1 1 1], 'UserData', ud);
+% ------^^^^^^^^^    createSimpleForm(handles); ^^^^^^^^^^^^^^-------------------
 function [h_field, posit, formField] = createSimpleField(formField, str, leftRIGHT, positAbove, positFig1, opts, h_field)
 fieldNdx = length(h_field) + 1 ;
 h_field(fieldNdx) = uicontrol(opts, 'position', positFig1, 'fontWeight', 'bold');

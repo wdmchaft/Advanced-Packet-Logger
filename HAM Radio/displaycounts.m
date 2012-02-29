@@ -211,7 +211,7 @@ end
 outpostOK = 0;
 %We need a few things from Outpost's .ini file so let's find that file.
 %  If we don't find it, we'll (evenutally) have defaults.
-[err, errMsg, outpostNmNValues] = OutpostINItoScript; 
+[err, errMsg, handles.outpostNmNValues] = OutpostINItoScript; 
 if err
   errMsg = strcat(modName, errMsg);
   return
@@ -225,25 +225,30 @@ if debugEnable
 end
 % handles.workingDir: where this program is located.  Batch file(s) written 
 %  by this program will also be there.
-if outpostOK
-  % location of  this program, the logging program (processOPM) and the semaphore files that are not in the
-  %  log's directory
-  handles.workingDir = outpostValByName('DirAddOnsPrgms', outpostNmNValues);
-  
-  %location of pac-forms
-  handles.DirPF = endWithBackSlash(outpostValByName('DirPF', outpostNmNValues));
-  handles.opCall = outpostValByName('StationID', outpostNmNValues);
-else
-  handles.workingDir = sprintf('%sAddOns\\Programs\\', endWithBackSlash(pwd)) ;
-  handles.DirPF = 'c:\pacforms\';
-  handles.opCall = '' ;
+if ~outpostOK
+  handles.outpostNmNValues = {};
+  handles.outpostNmNValues(length(handles.outpostNmNValues)+1) = {'DirAddOnsPrgms'};
+  handles.outpostNmNValues(length(handles.outpostNmNValues)+1) = {sprintf('%sAddOns\\Programs\\', endWithBackSlash(pwd))};
+  handles.outpostNmNValues(length(handles.outpostNmNValues)+1) = {'DirAddOns'};
+  handles.outpostNmNValues(length(handles.outpostNmNValues)+1) = {sprintf('%sAddOns\\', endWithBackSlash(pwd))};
+  handles.outpostNmNValues(length(handles.outpostNmNValues)+1) = {'DirPF'};
+  handles.outpostNmNValues(length(handles.outpostNmNValues)+1) = {'c:\pacforms\'};
+  handles.outpostNmNValues(length(handles.outpostNmNValues)+1) = {'StationID'};
+  handles.outpostNmNValues(length(handles.outpostNmNValues)+1) = {'n/a'};
 end
-nameForStore = sprintf('%s%s.mat', handles.workingDir, mfilename);
+% location of  this program, the logging program (processOPM) and the semaphore files that are not in the
+%  log's directory
+handles.workingDir = outpostValByName('DirAddOnsPrgms', handles.outpostNmNValues);
+handles.DirAddOns = outpostValByName('DirAddOns', handles.outpostNmNValues);
 
-% configuration files usually .ini
-%the configuration files are in the directory above the program's directory
-a = findstrchr('\', handles.workingDir);
-handles.configDir = handles.workingDir(1:a(length(a)-1));
+%location of pac-forms
+handles.DirPF = endWithBackSlash(outpostValByName('DirPF', handles.outpostNmNValues));
+handles.opCall = outpostValByName('StationID', handles.outpostNmNValues);
+
+nameNoExtForStore = sprintf('%s%s', handles.DirAddOns, mfilename);
+nameForStore = strcat(nameNoExtForStore, '.mat');
+
+handles.configDir = handles.DirAddOns;
 
 % Printers:
 % Ideally we'd like to have the program be able to switch from Portrait to Landscape,
@@ -314,7 +319,7 @@ handles.recentLogs = {} ;
 handles.pathsTologCopies = {};
 
 if outpostOK
-  handles.DirLogs = endWithBackSlash(outpostValByName('DirLogs', outpostNmNValues));
+  handles.DirLogs = endWithBackSlash(outpostValByName('DirLogs', handles.outpostNmNValues));
 else
   handles.DirLogs = '';
 end
@@ -358,8 +363,10 @@ for itemp = 1:length(fn);
     %program fiddles with the key: to clearly show when it isn't an option, it is changed to text
     %This makes sure that code will restore the key to whatever the latest "guide" design has styled
     handles.typePushbuttonOpenOutpost =  get(getfield(handles,char(fn(itemp))),'Style');
-  elseif findstrchr('togglebuttonPrint',char(fn(itemp)))
-    handles.typeTogglebuttonPrint =  get(getfield(handles,char(fn(itemp))),'Style');
+  elseif findstrchr('pushbuttonPrint',char(fn(itemp)))
+    handles.typePushbuttonPrint =  get(getfield(handles,char(fn(itemp))),'Style');
+  elseif findstrchr('pushbuttonViewer',char(fn(itemp)))
+    handles.typePushbuttonViewer =  get(getfield(handles,char(fn(itemp))),'Style');
   end
 end % for itemp = 1:length(fn);
 handles.copyLEDred = get(handles.copyLED(1), 'BackgroundColor') ;
@@ -373,22 +380,37 @@ handles.copyLEDblue = get(handles.copyLED(4), 'BackgroundColor') ;
 %  and the data is via the actual field names coded in "handles.dispFieldNms"
 %don't change this order - change the order in "handles.dispColOrdr"
 %  These names must match the names in displayLog's switch/case statement
-handles.dispColHdg = {'LOCAL-MSG-NO','TRANSFER-MSG-NO','BBS','OUTPOST-TIME','FORM-TIME',...
+handles.dispColHdg = {'LOCAL-MSG-NO','TRANSFER-MSG-NO','BBS','POST-TIME','OUTPOST-TIME','FORM-TIME',...
     'FROM','TO','MSG-TYPE','SUBJECT','COMMENT','REPLY-RQD.'};
 %these are the actual field names that contain the data to be displayed as defined in readPacketLog
 % 1:1 correspondence with the "dispColHdg" above for those items that are in
 % that list.  This list has additional entries so support items such as handles.len work
 %  If the log has additional fields, those will be added to then end of this list is displayLogs
-handles.dispFieldNms = {'logMsgNo','xfrMsgNo','bbs','shortOutpostDTime','shortFormDTime',...
+handles.dispFieldNms = {'logMsgNo','xfrMsgNo','bbs','shortOutpostPostDTime','shortOutpostDTime','shortFormDTime',...
     'from','to','formType','subject','comment','replyReqd',...
-    'outpostDTime','formDTime','fpathName','conditionChange'};
+    'outpostPostDTime','outpostDTime','formDTime','fpathName','conditionChange'};
 %default order of display.  
 a = [1:length(handles.dispColHdg)];
 %two dimensioned array: first is order, second is flag for visible
 handles.dispColOrdrDflt(a,1) = a; %sequential order
-handles.dispColOrdrDflt(a,2) = 1; %set to visible
+handles.dispColOrdrDflt(a,2) = 1; %set to visible... but we'll change that in a bit for 'shortOutpostPostDTime'
 handles.dispJust(a) = 0; %set to left justify
-handles.dispJust([4 5]) = 1; %set the short times to right justify
+
+%set the short times to right justify
+b = [];
+for itemp = 1:length(handles.dispFieldNms)
+  c = lower(char(handles.dispFieldNms(itemp)));
+  if (1 == findstrchr('short', c)) 
+    if (findstrchr('time', c)) 
+      b(length(b)+1) = itemp;
+      %default is to not display Post time.
+      if (findstrchr('shortoutpostpostdtime', c)) 
+        handles.dispColOrdrDflt(itemp,2) = 0; %set to not visible
+      end %if (findstrchr('shortOutpostPostDTime', c))
+    end % if (findstrchr('time', c))
+  end %if (1 == findstrchr('short', c))
+end % for itemp = 1:length(handles.dispFieldNms)
+handles.dispJust(b) = 1; 
 %current display column order. This may be changed by the user via "displayOrder"
 handles.dispColOrdr = handles.dispColOrdrDflt;
 handles.dispColFName = 'Default';
@@ -463,6 +485,7 @@ handles.posScoreBrd = get(handles.listboxScoreboard,'position');
 handles.posScoreSumm = get(handles.listboxScoreboardSumm,'position');
 adjustView(handles)
 handles.nameForStore = nameForStore;
+handles.nameNoExtForStore = nameNoExtForStore;
 set(figure1,'visible','on');
 
 %Need two files to be semaphore flags.  Both are looked at by the program that writes the Packet Log, 
@@ -479,36 +502,41 @@ a = findstrchr('_', date_time);
 tm = date_time(a+1:length(date_time));
 %started here & refined line 3 lines down by adding the time as a suffix:
 handles.semaphoreCoreName = 'PkLgMonitor' ;
-handles.programRunningSimpleExt = sprintf('%s%s_on.txt', handles.workingDir, handles.semaphoreCoreName) ;
+%  handles.programRunningSimpleExt = <DirAddOnsPrgms>PkLgMonitor_on.txt
+handles.programRunningSimpleExt = sprintf('%s%s_on.txt', handles.DirAddOns, handles.semaphoreCoreName) ;
 %modify semaphoreCoreName: add the time as a suffix to make it unique
+%  handles.semaphoreCoreName = PkLgMonitor<HrMnSecond>_
 handles.semaphoreCoreName = sprintf('%s%s_', handles.semaphoreCoreName, tm) ;
-handles.programRunning = sprintf('%s%s', handles.workingDir, handles.semaphoreCoreName) ;
-%write the unique time stamped semaphore flag used by processOPM (do we really need a unique one? AR Jan 2010)
+%  handles.programRunning = <DirAddOnsPrgms>PkLgMonitor<HrMnSecond>_
+handles.programRunning = sprintf('%s%s', handles.DirAddOns, handles.semaphoreCoreName) ;
+
+%delete any flag files that were created the last time this program was run
+%  and accidently not removed when the program exited - happens if program
+%  aborted.
+handles.flagFname = strcat(nameNoExtForStore,'_lastFlags.mat');
+handles.flagFileList = delFilesFromLastRun(handles.flagFname);%write the unique time stamped semaphore flag used by processOPM (do we really need a unique one? AR Jan 2010)
 % "0": indicates monitor loop is not running so auto-updating of copies isn't active
-writePrgmRunning(handles, 0) ;
+handles = writePrgmRunning(handles, 0, mfilename) ;
 %write the semaphore flag used by the script
-fid = fopen(handles.programRunningSimpleExt,'w');
-if (fid > 0)
-  fprintf(fid,'This file indicates that "%s" is running - it is created when it starts & deleted when it closes.', mfilename);
-  fclose(fid);
-end
+handles = writeMonitorOn(handles);
 
 % Make sure both types of lists of copy location exist even if empty:
 %   if they don't exist, these calls will cause them to be created & they will include usage instructions 
 %List when monitoring a remote computer:
-[err, errMsg, handles.pathsTologCopies] = readProcessOPM_Logs(handles.configDir,...
+[err, errMsg, handles.pathsTologCopies] = readProcessOPM_Logs(handles.DirAddOns,...
   'network_PkLgMonitor_logs.ini',sprintf('This file is used by "%s" when monitoring a Packet Log on a network.', mfilename));
 %List for this computer
-[err, errMsg, handles.pathsTologCopies] = readProcessOPM_Logs(handles.configDir);
+[err, errMsg, handles.pathsTologCopies] = readProcessOPM_Logs(handles.DirAddOns);
 %The active list is opened in "readNDspPckt"
 handles.pathsTologCopies = {};
 
 %load the alias list
-[handles.tacAlias, handles.tacCall] = readTacCallAlias(outpostValByName('DirAddOns', outpostNmNValues));
+[handles.tacAlias, handles.tacCall] = readTacCallAlias(handles.DirAddOns);
+% [tacAlias, tacCall, txtLineArray, errMsg, fname, tacType]
 
 %load the settings regarding printing the log
 [err, errMsg, handles.logPrtEnable, handles.logPrt_minuteInterval, handles.logPrt_mnmToPrt, handles.logPrt_msgNums]...
-  = readLogPrintINI(outpostValByName('DirAddOns', outpostNmNValues));
+  = readLogPrintINI(handles.DirAddOns);
 %   page numbering to be displayed on hardcopy of log
 handles.logPrintFirstPageNum = 1;
 %  line of data from log that the printing is to
@@ -648,7 +676,9 @@ end
 if a
   %viewing of messages is enabled - text will be enabled & decide if PACF also.
   enable = 'on';
-  a = {'Enable', enable, 'style', handles.typePushbuttonOpenOutpost};
+  a1 = {'Enable', enable, 'style', handles.typePushbuttonOpenOutpost};
+  a2 = {'Enable', enable, 'style', handles.typePushbuttonPrint};
+  a3 = {'Enable', enable, 'style', handles.typePushbuttonViewer};
   if findstrchr('simple',lower(char(handles.logged(ud.listSortedNdx, find(ismember(handles.dispFieldNms,'formType'))))) )
     %simple message - not a PACF so disabled PACF viewing
     set(handles.pushbuttonOpenPACF,'Enable', 'off','style','text');
@@ -662,17 +692,21 @@ if a
     pushbuttonOpenOutpost_Callback(h, eventdata, handles);
   end %if strcmp(get(handles.figure1,'SelectionType'),'open')
   %enable the print button
-  % % set(handles.togglebuttonPrint,'Enable', enable,'style', handles.typeTogglebuttonPrint);
+  % % set(handles.togglebuttonPrint,'Enable', enable,'style', handles.typePushbuttonPrint);
 else %if a
   % viewing of messages is not enabled.
   enable = 'off';
-  a = {'Enable', enable,'style', 'text'};
-  set(handles.pushbuttonOpenPACF, a{:});
+  a1 = {'Enable', enable,'style', 'text'};
+  a2 = a1;
+  a3 = a1;
+  set(handles.pushbuttonOpenPACF, a1{:});
   %disable (grey out) the print button
-  % % set(handles.togglebuttonPrint,'Enable', enable,'style','text');
+  % % set(handles.pushbuttonPrint,'Enable', enable,'style','text');
 end % if a else
 %enable/disable text (aka Outpost) viewing
-set(handles.pushbuttonOpenOutpost, a{:});
+set(handles.pushbuttonOpenOutpost, a1{:});
+set(handles.pushbuttonPrint, a2{:});
+set(handles.pushbuttonViewer, a3{:});
 %enable/disable (grey out) the frame and the label for the frame & buttons
 set(handles.frameOpen,'Enable', enable);
 set(handles.textOpen,'Enable', enable);
@@ -775,28 +809,33 @@ for jtemp = 1:size(handles.dispColOrdr,1)
       else
         thisHdg = '';
       end %if thisLen
+    case 'POST-TIME'
+      if (thisLen < length(thisHdg))
+        %time is at least 4 digits
+        thisHdg = 'PosT';
+      end %if (thisLen < length(thisHdg))
     case 'OUTPOST-TIME'
       if (thisLen < length(thisHdg))
         %time is at least 4 digits
-        thisHdg = 'OTME';
-      end %if (handles.len.shortOutpostDTime < length(a))
+        thisHdg = 'OupT';
+      end %if (thisLen < length(thisHdg))
     case 'FORM-TIME'
       if (thisLen < length(thisHdg))
         if thisLen
           %time is at least 4 digits
-          thisHdg = 'FTME';
+          thisHdg = 'ForT';
         else
           thisHdg = '';
         end
-      end %if (handles.len.shortOutpostDTime < length(a))
+      end %if (thisLen < length(thisHdg))
     case 'MSG-TYPE'
       if (thisLen < length(thisHdg))
         thisHdg = 'TYPE';
-      end %if (handles.len.shortOutpostDTime < length(a))
+      end %if (thisLen < length(thisHdg))
     case 'COMMENT'
       if ~thisLen
         thisHdg = '';
-      end %if (handles.len.shortOutpostDTime < length(a))
+      end %if ~thisLen
     otherwise
     end % switch thisHdg
     
@@ -965,22 +1004,24 @@ function [err, errMsg] = readNDspPckt(handles, logPathNName)
 if ~length(logPathNName)
   err = 0;
   errMsg = '';
+  writePrgmRunning(handles, 0, mfilename) ;
   return
 end
 [err, errMsg, logged, header, columnHeader] = readPacketLog(logPathNName) ;
 if err
   set(handles.listboxAllStation,'string', errMsg) ;
   setSortButtons(handles, 0);
+  writePrgmRunning(handles, 0, mfilename) ;
   return
 end
 %move highlight to first line: new load of log
 set(handles.listboxAllStation,'value',1)
 if (1 == findstrchr('\\', handles.logPath))
-  [err, errMsg, handles.pathsTologCopies] = readProcessOPM_Logs(handles.configDir,...
+  [err, errMsg, handles.pathsTologCopies] = readProcessOPM_Logs(handles.DirAddOns,...
     'network_PkLgMonitor_logs.ini','This file is used by "%s" when monitoring a Packet Log on a network.');
 else
   %log is from a local drive: read the locations for the copies of the logs:
-  [err, errMsg, handles.pathsTologCopies] = readProcessOPM_Logs(handles.configDir);
+  [err, errMsg, handles.pathsTologCopies] = readProcessOPM_Logs(handles.DirAddOns);
 end
 
 %update the log type popup appropriately
@@ -991,6 +1032,9 @@ elseif findstrchr('_Sent', logPathNName)
   val = 3;
 end
 set(handles.popupmenuWhichLog, 'Value', val);
+%Update the semaphore file (for processOutpostPacketMessages)
+%  to include the current log's name if the Monitor is running.
+writePrgmRunning(handles, get(handles.togglebuttonMonitorLog,'value'), mfilename) ;
 
 %reformat the address information to remove excess information
 % that can be present after an "@"
@@ -1020,8 +1064,9 @@ if found
   logDate = datenum(sprintf('%s/%s/%s', a((length(a)-3):(length(a)-2)), a((length(a)-1):(length(a))),a(1:(length(a)-4))));
   for itemp = 1:length(logged)
     logged(itemp).shortOutpostDTime = cleanDateTime(logged(itemp).outpostDTime, logDate);
+    logged(itemp).shortOutpostPostDTime = cleanDateTime(logged(itemp).outpostPostDTime, logDate);
     logged(itemp).shortFormDTime = cleanDateTime(logged(itemp).formDTime, logDate);
-    logged(itemp).shortOutpostPostTime = cleanDateTime(logged(itemp).outpostPostTime, logDate);
+    logged(itemp).shortoutpostPostDTime = cleanDateTime(logged(itemp).outpostPostDTime, logDate);
   end %for itemp = 1:length(logged)
 end % if found
 
@@ -1038,7 +1083,7 @@ for fieldNdx = 1:length(fn)
   %get the name of a variable in the structure "logged"
   thisField = char(fn(fieldNdx));
   %make sure we know of this name
-  if ~find(ismember(handles.dispFieldNms,thisField))
+  if ~length(find(ismember(handles.dispFieldNms,thisField)))
     handles.dispFieldNms(length(handles.dispFieldNms)+1) = {thisField};
   end
   %add a field to the len structure of the same name & give it the value associated with the first logged entry
@@ -1167,10 +1212,21 @@ if ~(ismember(val, handles.nonLogLines))
   else %if length(find(ismember(handles.h_displayTextPathName, msgPathName)))
     %window is not open: create one
     %read the file into a cell array & then pass to the listBox of displayText
-    fid = fopen(msgPathName, 'r');
-    if fid < 1
-      errordlg(sprintf('Unable to open "%s"', msgPathName),'File Error');
-      return
+    % first read the heading
+    [err, errMsg, outpostHdg, fid, fpPosition, msg, linesRead, msgPNameExt, receivedFlag]...
+      = readOutpostHeading(msgPathName);
+    oldHdg = 0;
+    if oldHdg
+      fid = fopen(msgPathName, 'r');
+      if fid < 1
+        errordlg(sprintf('Unable to open "%s"', msgPathName),'File Error');
+        return
+      end
+    else
+      if err
+        errordlg(errMsg, 'File Error');
+        return
+      end
     end
     %update book keeping
     handles.h_displayTextNdx = handles.h_displayTextNdx + 1;
@@ -1190,104 +1246,158 @@ if ~(ismember(val, handles.nonLogLines))
     list = {};
     count = 0;
     asReadCnt = 0;
-    %populate the "heading" area: we're getting the data from 6 heading lines
-    % so we'll quit loading the head when we reach that number or when 
-    % a line starts with something other than a recognized heading
-    hdgLine = 0; % heading display number
-    % names/titles of the lines as they appear in the message
-    hdgNames = {'bbs:','from:','to:','subject:',...
-        'sent:','received:'};
-    hdgNamesNdx = [1:length(hdgNames)] ;
-    specialHdg = {'local msg.#','local msg id','_message'} ;
-    specialHdgFound = 0;
-    %by inspection: longest heading is "subject:" which has ":" in 8th position
-    spaces(1:7) = ' ' ;
-    while hdgLine < 7 ;
-      textLine = fgetl(fid) ;
-      a = lower(textLine);
-      for itemp = 1:length(specialHdg)
-        b = findstrchr(specialHdg{itemp}, a);
-        if b
-          b = b(1);
-          % if "_message"
-          if itemp == 3
-            %no local ID
-            % set the local ID field to be a blank
-            set(handlesText.textHdg6, 'string', '');
-            c = textLine;
-          else
-            %local id is present
-            set(handlesText.textHdg6, 'string', textLine(b:length(textLine)) );
-            c = textLine(1:b-1);
-          end
-          % from the Message Type, pull the "_" which are there only for the script
-          c = strtrim(strrep(c, '_', ' '));
-          set(handlesText.textMsgType, 'string', c)
-          specialHdg = {};
-          hdgLine = hdgLine + 1;
-          a = ''; %clear: use as flag to indicate we've found it
-          break
-        end % if findstrchr(specialHdg{itemp}, textLine)
-      end % for itemp = 1:length(specialHdg)
-      if specialHdgFound | length(specialHdg)
-        for hdgNamesNdx = 1:length(hdgNames)
-          if (1 == findstrchr(a, char(hdgNames(hdgNamesNdx))))
-            b = findstrchr(':', textLine);
-            %only want one space after the first ":"
-            c = strtrim(textLine(b(1)+1:length(textLine)));
-            textLine = sprintf('%s %s', textLine(1:b(1)), c);
-            %by inspection: longest heading is "subject:" which has ":" in 8th position
-            textLine = sprintf('%s%s', spaces(1:(8-b(1))), textLine);
+    if oldHdg
+      %populate the "heading" area: we're getting the data from 6 heading lines
+      % so we'll quit loading the head when we reach that number or when 
+      % a line starts with something other than a recognized heading
+      hdgLine = 0; % heading display number
+      % names/titles of the lines as they appear in the message
+      hdgNames = {'bbs:','from:','to:','subject:',...
+          'sent:','received:'};
+      hdgNamesNdx = [1:length(hdgNames)] ;
+      specialHdg = {'local msg.#','local msg id','_message'} ;
+      specialHdgFound = 0;
+      %by inspection: longest heading is "subject:" which has ":" in 8th position
+      spaces(1:7) = ' ' ;
+      while hdgLine < 7 ;
+        textLine = fgetl(fid) ;
+        a = lower(textLine);
+        for itemp = 1:length(specialHdg)
+          b = findstrchr(specialHdg{itemp}, a);
+          if b
+            b = b(1);
+            % if "_message"
+            if itemp == 3
+              %no local ID
+              % set the local ID field to be a blank
+              set(handlesText.textHdg6, 'string', '');
+              c = textLine;
+            else
+              %local id is present
+              set(handlesText.textHdg6, 'string', textLine(b:length(textLine)) );
+              c = textLine(1:b-1);
+            end
+            % from the Message Type, pull the "_" which are there only for the script
+            c = strtrim(strrep(c, '_', ' '));
+            set(handlesText.textMsgType, 'string', c)
+            specialHdg = {};
             hdgLine = hdgLine + 1;
-            switch hdgNamesNdx
-            case 1 % BBS
-              set(handlesText.textHdg1, 'string', textLine);
-            case 2 % From
-              set(handlesText.textHdg2, 'string', textLine);
-            case 3 % To
-              [textLine, newpos] = textwrap(handlesText.lbHdg3, {textLine});
-              if length(textLine) > 1
-                sty = 'listbox';
-              else
-                sty = 'text';
-                posit = get(handlesText.lbHdg3, 'Position');
-                % ui is taller than needed: adjust bottom...
-                posit(2) = posit(2) + (posit(4) - newpos(4));
-                %.. reduce heigh
-                posit(4) = newpos(4);
-                % move "Subject:" box up/down page to touch bottom of "To:" which is
-                %  different height when listbox vs text
-                b = get(handlesText.textHdg4, 'Position');
-                mv = posit(2) - (b(2) + b(4));
-                b(2) = b(2) + mv;
-                set(handlesText.textHdg4, 'Position', b);
-                posit(1) = b(1);
-                set(handlesText.lbHdg3, 'Position', posit);
-                % raise height of list box
-                posit = get(handlesText.listbox1, 'Position');
-                % gap?
-                mv = b(2) - (posit(2) + posit(4));
-                posit(4) = posit(4) + mv ;
-                set(handlesText.listbox1, 'Position', posit);
-              end
-              set(handlesText.lbHdg3, 'style', sty, 'string', textLine);
-            case 4 % Subject
-              set(handlesText.textHdg4, 'string', textLine);
-            case {5 6} % time (sent/received)
-              set(handlesText.textHdg5, 'string', textLine);
-            end % switch hdgLine
             a = ''; %clear: use as flag to indicate we've found it
-            break;
-          end % switch hdgLine
-        end % for hdgNamesNdx = 1:length(hdgNames)
-      else % if specialHdgFound
-        specialHdgFound = ~length(specialHdg);
-      end % if specialHdgFoundelse
-      if length(a)
-        %not a recognized heading line: must have gone beyond heading!
-        break; %the while
+            break
+          end % if findstrchr(specialHdg{itemp}, textLine)
+        end % for itemp = 1:length(specialHdg)
+        if specialHdgFound | length(specialHdg)
+          for hdgNamesNdx = 1:length(hdgNames)
+            if (1 == findstrchr(a, char(hdgNames(hdgNamesNdx))))
+              b = findstrchr(':', textLine);
+              %only want one space after the first ":"
+              c = strtrim(textLine(b(1)+1:length(textLine)));
+              textLine = sprintf('%s %s', textLine(1:b(1)), c);
+              %by inspection: longest heading is "subject:" which has ":" in 8th position
+              textLine = sprintf('%s%s', spaces(1:(8-b(1))), textLine);
+              hdgLine = hdgLine + 1;
+              switch hdgNamesNdx
+              case 1 % BBS
+                set(handlesText.textHdg1, 'string', textLine);
+              case 2 % From
+                set(handlesText.textHdg2, 'string', textLine);
+              case 3 % To
+                [textLine, newpos] = textwrap(handlesText.lbHdg3, {textLine});
+                if length(textLine) > 1
+                  sty = 'listbox';
+                else
+                  sty = 'text';
+                  posit = get(handlesText.lbHdg3, 'Position');
+                  % ui is taller than needed: adjust bottom...
+                  posit(2) = posit(2) + (posit(4) - newpos(4));
+                  %.. reduce heigh
+                  posit(4) = newpos(4);
+                  % move "Subject:" box up/down page to touch bottom of "To:" which is
+                  %  different height when listbox vs text
+                  b = get(handlesText.textHdg4, 'Position');
+                  mv = posit(2) - (b(2) + b(4));
+                  b(2) = b(2) + mv;
+                  set(handlesText.textHdg4, 'Position', b);
+                  posit(1) = b(1);
+                  set(handlesText.lbHdg3, 'Position', posit);
+                  % raise height of list box
+                  posit = get(handlesText.listbox1, 'Position');
+                  % gap?
+                  mv = b(2) - (posit(2) + posit(4));
+                  posit(4) = posit(4) + mv ;
+                  set(handlesText.listbox1, 'Position', posit);
+                end
+                set(handlesText.lbHdg3, 'style', sty, 'string', textLine);
+              case 4 % Subject
+                set(handlesText.textHdg4, 'string', textLine);
+              case {5 6} % time (sent/received)
+                set(handlesText.textHdg5, 'string', textLine);
+              end % switch hdgLine
+              a = ''; %clear: use as flag to indicate we've found it
+              break;
+            end % switch hdgLine
+          end % for hdgNamesNdx = 1:length(hdgNames)
+        else % if specialHdgFound
+          specialHdgFound = ~length(specialHdg);
+        end % if specialHdgFoundelse
+        if length(a)
+          %not a recognized heading line: must have gone beyond heading!
+          break; %the while
+        end
+      end %while hdgLine < 5
+    else %    if oldHdg
+      %by inspection: longest heading is "received:" which has ":" in 9th position
+      set(handlesText.textMsgType, 'string', outpostHdg.bbsMsgType)
+      set(handlesText.textHdg1, 'string', sprintf('     BBS: %s', outpostHdg.bbs));
+      set(handlesText.textHdg2, 'string', sprintf('    FROM: %s', outpostHdg.from));
+      % To: may go to multiple recipients in which case we need to use a listbox.
+      %  If only one recipient, we use a text box & need to adjust its bottom
+      %   position & the position of the message's list box directly below
+      [textLine, newpos] = textwrap(handlesText.lbHdg3, {sprintf('      TO: %s', outpostHdg.to) });
+      if length(textLine) > 1
+        sty = 'listbox';
+      else
+        sty = 'text';
+        posit = get(handlesText.lbHdg3, 'Position');
+        % ui is taller than needed: adjust bottom...
+        posit(2) = posit(2) + (posit(4) - newpos(4));
+        %.. reduce height
+        posit(4) = newpos(4);
+        % move "Subject:" box up/down page to touch bottom of "To:" which is
+        %  different height when listbox vs text
+        b = get(handlesText.textHdg4, 'Position');
+        mv = posit(2) - (b(2) + b(4));
+        b(2) = b(2) + mv;
+        set(handlesText.textHdg4, 'Position', b);
+        posit(1) = b(1);
+        set(handlesText.lbHdg3, 'Position', posit);
+        % raise height of list box
+        posit = get(handlesText.listbox1, 'Position');
+        % gap?
+        mv = b(2) - (posit(2) + posit(4));
+        posit(4) = posit(4) + mv ;
+        set(handlesText.listbox1, 'Position', posit);
       end
-    end %while hdgLine < 5
+      set(handlesText.lbHdg3, 'style', sty, 'string', textLine);
+      set(handlesText.textHdg4, 'string', sprintf(' Subject: %s', outpostHdg.subject));
+      % headings on the right edge
+      if receivedFlag
+        set(handlesText.textHdg5, 'string', sprintf('Received: %s', outpostHdg.dateTime));
+      else
+        set(handlesText.textHdg5, 'string', sprintf('    Sent: %s', outpostHdg.dateTime));
+      end
+      if length(outpostHdg.logMsgNum)
+        set(handlesText.textHdg6, 'string', sprintf('Local Msg.#: %s', outpostHdg.logMsgNum));
+      else
+        set(handlesText.textHdg6, 'string', '');
+      end
+      if length(outpostHdg.postDTime)
+        set(handlesText.textPostTime, 'string', sprintf('Posted: %s', outpostHdg.postDTime));
+      else
+        set(handlesText.textPostTime, 'string', '');
+      end
+      a = '';
+    end %     if oldHdg  else
     while ~feof(fid)
       if length(a)
         a ='';
@@ -1411,6 +1521,21 @@ function varargout = pushbuttonOpenPACF_Callback(h, eventdata, handles, varargin
 
 %pac-read.exe $1 INI C:\PacFORMS\data\sent\sample.tx
 
+msgPathName = getMsgNameInfo(handles);
+%confirm we're not pointing to the heading or a conditioned changed informational line
+if length(msgPathName)
+  %get the name of the button as established elsewhere
+  outText = get(handles.pushbuttonOpenPACF,'string');
+  %rename the button because this process takes a bit & therefore operator needs to know WIP
+  set(handles.pushbuttonOpenPACF,'string','working');
+  [err, errMsg] = viewPACF(handles.DirPF, handles.workingDir, msgPathName);
+  %all done: restore the button name
+  set(handles.pushbuttonOpenPACF,'string',outText);
+end
+%release the button
+set(handles.pushbuttonOpenPACF,'val', 0);
+% --------------------------------------------------------------------
+function msgPathName = getMsgNameInfo(handles);
 val = get(handles.listboxAllStation, 'Val');
 %confirm we're not pointing to the heading or a conditioned changed informational line
 if ~(ismember(val, handles.nonLogLines))
@@ -1418,19 +1543,10 @@ if ~(ismember(val, handles.nonLogLines))
   val = val - length(find(handles.nonLogLines < val));
   % increase the index by the number of logged lines that aren't being displayed
   val = val + length(find(handles.noDispLogLines < val));
-  %get the name of the button as established elsewhere
-  outText = get(handles.pushbuttonOpenPACF,'string');
-  %rename the button because this process takes a bit & therefore operator needs to know WIP
-  set(handles.pushbuttonOpenPACF,'string','working');
-
   msgPathName = repathIfNet(handles.logged(handles.listSortedNdx(val),find(ismember(handles.dispFieldNms,'fpathName'))), handles);
-  [err, errMsg] = viewPACF(handles.DirPF, handles.workingDir, msgPathName);
-  %all done: restore the button name
-  set(handles.pushbuttonOpenPACF,'string',outText);
+else
+  msgPathName = '';
 end
-%release the button
-set(handles.pushbuttonOpenPACF,'val', 0);
-
 % --------------------------------------------------------------------
 function varargout = displayCounts_CloseRequestFcn(hObject, eventdata, handles, varargin)
 %Called when user attempts to close this program's window.
@@ -1825,7 +1941,7 @@ lbl = get(h,'string');
 % regarding which log if any is being monitored.  This is used by processOutpostMessages
 % so it can decide whether it needs to keep the copies up-to-date or if this program
 % will be keeping the copies up to date.
-writePrgmRunning(handles, val);
+handles = writePrgmRunning(handles, val, mfilename);
 if val
   %
   handles.monitoring = 1;
@@ -1834,6 +1950,7 @@ if val
   lbl = strrep(lbl,' Off',' On');
   %. . .make the "light" visible so the ToolTip can work....
   set(handles.textMonitoring, 'Visible','on');
+  drawnow
   set(h,'BackgroundColor', get(handles.figure1,'Color'));
   %. . . and initialize the update timer for the momentary indicator
   gt = 0;
@@ -2015,6 +2132,7 @@ while 1
           %turn off the green background - it came on when we last checked the Log's time
           set(handles.textMonitoring,'BackgroundColor', get(handles.figure1,'Color'));
           set(handles.figure1,'windowstyle','normal')
+          drawnow
         end
         val = get(h,'Value');
         if ~val
@@ -2457,7 +2575,7 @@ a = dir(strcat(mfilename,'.m'));
 codeDetail = sprintf('%s \n(running %s.m file: %s)', codeDetail, mfilename, a(1).date);
 userCancel = 1;
 %#ENDIF
-codeDetail = sprintf('%s \n\nCopyright 2009-2010 Andy Rose  KI6SEP\nAll rights reserved.', codeDetail);
+codeDetail = sprintf('%s \n\nCopyright 2009-2011 Andy Rose  KI6SEP\nAll rights reserved.', codeDetail);
 % --------------------------------------------------------------------
 function viewScoreboard_Callback(h, eventdata, handles, varargin)
 %toggle the indicator's state
@@ -2542,17 +2660,6 @@ end %if offON else
 function varargout = helpAbout_Callback(h, eventdata, handles, varargin)
 [codeName, codeVersion, codeDetail] = getCodeVersion(handles);
 helpdlg(sprintf('%s\nVersion %s %s\n\nMonitoring program for Outpost Packet Message Manager\nCopyright by Jim Oberhofer KN6PE', codeName, codeVersion, codeDetail), sprintf('About %s', codeName));
-% --------------------------------------------------------------------
-function varargout = writePrgmRunning(handles, monitorRunning) ;
-fid = fopen(strcat(handles.programRunning, 'on.txt'),'w');
-if (fid > 0)
-  fprintf(fid,'This file indicates that "%s" is running - it is created when it starts & deleted when it closes.', mfilename);
-  if monitorRunning
-    %don't change this wording without updating processOutpostMessages's reading operation
-    fprintf(fid,'\r\nmonitoredLog = %s', handles.logPathName);
-  end
-  fclose(fid);
-end
 % --------------------------------------------------------------------
 function thisStation = cleanStationAddress(thisStation);
 % to improve readability, we'll lower case anything the "@" 
@@ -2686,15 +2793,90 @@ function varargout = listboxScoreboardSumm_Callback(h, eventdata, handles, varar
 if (nargin > 3)
   summScoreboard(handles, varargin);
 end
-
-
-
 % --------------------------------------------------------------------
-function varargout = togglebuttonPrint_Callback(h, eventdata, handles, varargin)
-
-
-
-
+function varargout = pushbuttonPrint_Callback(h, eventdata, handles, varargin)
+%print the message in the proper Form - does not use browser
+[printerSetup, pname, fname] = prepViewOrPrint(handles);
+if length(pname)
+  % "printerSetup" structure 
+  %   printerSetup.HPL3: numeric
+  %   printerSetup.printerPort: string (eg LPT1:)
+  %   printerSetup.copyList 
+  %   printerSetup.printEnable: numeric
+  %    0: printer disabled
+  %    1: pre-printed form in printer & printer enabled. may be reset by the INI files - cannot be set by the INI file.
+  %       i.e.: to print this passed in variable must be set AND if the INI file is found and has a value for print 
+  %       enable, it must to set.  No printing will occur if the file doesn't exist, doesn't contain printEnable, 
+  %       or if its value for printEnable is cleared.
+  %    2: blank paper in printer, printer enable -> data will be loaded into form, printer 
+  %       activated for <# of copies> (loaded from 'print_ICS_213.ini'), and the form will be closed.
+  %    3: printer disabled, enable data displayed on screen
+  %   printerSetup.numCopies 
+  %   -1: print all in list [default]
+  %    0: print none regardless of printEnable
+  %   >0: print that many copies up but no more than in the list
+  prompt  = {'Number of copies:'};
+  title   = 'Message Printing';
+  lines   = 1;
+  def     = {num2str(1)};
+  answer  = inputdlg(prompt,title,lines,def);
+  if ~length(answer)
+    return
+  end
+  printerSetup.numCopies = str2num(answer{1});
+  for itemp = 1:printerSetup.numCopies
+    printerSetup.copyList(itemp) ={'Manual print'};
+  end % for itemp = 1:printerSetup.numCopies
+  printerSetup.numCopies = -1 ;
+  [err, errMsg, outpostHdg, printed, form] ...
+    = processMessage(pname, fname, '', handles.outpostNmNValues, printerSetup);
+end
+set(h, 'value', 0);
 % --------------------------------------------------------------------
-function varargout = togglebuttonPrintPACF_Callback(h, eventdata, handles, varargin)
-%not used & may never be used - place holder
+function varargout = pushbuttonViewer_Callback(h, eventdata, handles, varargin)
+%bring message up in non-browser Form on screen
+[printerSetup, pname, fname] = prepViewOrPrint(handles);
+if length(pname)
+  printerSetup.HPL3 = 0;
+  printerSetup.printerPort = '';
+  %   printerSetup.printEnable: numeric
+  %    3: printer disabled, enable data displayed on screen
+  printerSetup.printEnable = 3 ;
+  %   printerSetup.numCopies 
+  %   -1: print all in list [default]
+  printerSetup.numCopies = -1 ;
+  % empty print list
+  printerSetup.copyList ={''};
+  [err, errMsg, outpostHdg, printed, form] ...
+    = processMessage(pname, fname, '', handles.outpostNmNValues, printerSetup);
+  if err
+    fprintf('\n%s%s', mfilename, errMsg);
+  end
+end
+set(h, 'value', 0);
+% --------------------------------------------------------------------
+function [printerSetup, pname, fname] = prepViewOrPrint(handles);
+%determine if a message is highlighted.  If so, get its path & name
+%  re-pathed as needed if over network.
+msgPathName = getMsgNameInfo(handles);
+%if a message was selected....
+if length(msgPathName)
+  % get obtain the printer settings.  Most we'll override but
+  %we do care if blank paper or pre-printed form.
+  [pname,name,ext,versn] = fileparts(msgPathName);
+  pname = endWithBackSlash(pname);
+  fname = strcat(name, ext);
+  [err, errMsg, printerSetup] = readProcessOPM_INI(handles.DirAddOns);
+  %   printerSetup.printEnable: numeric
+  %    3: printer disabled, enable data displayed on screen
+  %   printerSetup.numCopies 
+  %   -1: print all in list [default]
+  %    0: print none regardless of printEnable
+  %   >0: print that many copies up but no more than in the list
+  [err, errMsg, printerSetup] = readPrintINI(outpostValByName('DirAddOns', handles.outpostNmNValues), printerSetup, findstrchr('R', fname(1:1)) );
+else
+  printerSetup = [];
+  pname = ''; 
+  fname = '';
+end
+% --------------------------------------------------------------------

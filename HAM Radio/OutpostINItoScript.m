@@ -1,5 +1,5 @@
-function [err, errMsg, outpostNmNValues, outpostVarNameList] = OutpostINItoScript(thisDir, callerModName);
-%function [err, errMsg, outpostNmNValues, outpostVarNameList] = OutpostINItoScript([thisDir[, callerModName]]);
+function [err, errMsg, outpostNmNValues, outpostVarNameList] = OutpostINItoScript(thisDir, callerModName, addINIPairs);
+%function [err, errMsg, outpostNmNValues, outpostVarNameList] = OutpostINItoScript([thisDir[, callerModName[,  addINIPairs]]]);
 %Reads Outpost.INI from the Outpost directory, determines
 % StationID, BBS, TNC, etc and if caller isn't asking for return
 % variables, writes the variables to separate files
@@ -36,6 +36,8 @@ function [err, errMsg, outpostNmNValues, outpostVarNameList] = OutpostINItoScrip
 %    "Outpost.INI" - if not, establishes the starting drive for the
 %    search for the Outpost directory.  If not present, search will start
 %    on the current drive.  Search performed by "findOutpostINI"
+%    MAY also contain the name of Outpost.ini such as for use by packetLogSettings
+%      when comparing the current Outpost.ini with a reference/expect settings Outpost.ini
 %  callerModName[optional]: not used
 %  addINIPairs[optional]: Additionaly variable(s) desired from that INI that are not in the
 %    hard-coded predefined list.  Paired: name of variable exactly as it appears in Outpost.INI to
@@ -53,6 +55,8 @@ function [err, errMsg, outpostNmNValues, outpostVarNameList] = OutpostINItoScrip
 %      dirArchive = outpostValByName('DirArchive', outpostVarNameList, outpostValues) ;
 
 [err, errMsg, modName] = initErrModName(mfilename);
+outpostNmNValues = {};
+outpostVarNameList = {};
 
 verbose = 0;
 veryVerbose = 0;
@@ -71,7 +75,14 @@ end % if ~verbose
   
 if (nargin < 1)
   thisDir = '';
+  nameExt = '';
+else
+  [thisDir,name,ext,versn] = fileparts(thisDir);
+  nameExt = sprintf('%s%s', name, ext);
 end % if (nargin < 1)
+if ~length(nameExt)
+  nameExt = 'Outpost.INI';
+end
 if (nargin < 2)
   callerModName = '';
 end % if (nargin < 2)
@@ -138,6 +149,38 @@ a = [{...
 % SLS=1 with hypenation
 % SLS=2 date time format
 
+if length(addINIPairs)
+  itemp = 1 ;
+  Ndx = [1:2:length(a)];
+  while itemp < length(a)
+    b = find(ismember(a(Ndx), a(itemp)));
+    if length(b) > 1
+      %#IFDEF debugOnly
+      % only want to report duplicates in IDE. If not IDE, remove & continue
+      % duplicate found! Remove all but first occurance
+        errMsg = sprintf('%s"%s" duplicated %i times ', errMsg, a{itemp}, length(b)-1) ;
+      %#ENDIF
+      b = Ndx(b);
+      for jtemp = length(b):-1:2
+        a = a([1:(b(jtemp)-1) (b(jtemp)+2):length(a)]);
+      end
+      % list altered: update Ndx
+      Ndx = [1:2:length(a)];
+    else %if length(b) > 1
+      %no duplicate: look up next
+      itemp = itemp + 2;
+    end %%if length(b) > 1
+  end % while itemp < length(a)
+  %#IFDEF debugOnly
+  % only want to report duplicates in IDE. If not IDE, remove & continue
+  if length(errMsg)
+    errMsg = sprintf('Search variable issues: %s', errMsg);
+    err = 1;
+    return
+  end %if length(errMsg)
+  %#ENDIF
+end
+
 outpostVarNameList = a(1:2:length(a));
 for itemp = 1:length(outpostVarNameList)
   outpostWriteFileList(itemp) = a{2*itemp};
@@ -176,7 +219,7 @@ fid = 0;
 if (length(thisDir))
   thisDir = endWithBackSlash(thisDir);
   %test if the passed in 'thisDir' actually points to the directory with 'Outpost.ini'
-  fid = fopen(sprintf('%sOutpost.INI', thisDir), 'r');
+  fid = fopen(sprintf('%s%s', thisDir, nameExt), 'r');
   if (fid > 0)
     DirOutpost = thisDir;
     %leave file open - should be faster than closing and re-opening
@@ -208,7 +251,7 @@ if err
 end
 %if file isn't open (i.e.: if passed-in "thisDir" didn't point to the directory containing "Outpost.INI")
 if (fid < 1)
- fid = fopen(sprintf('%sOutpost.INI', DirOutpost), 'r');
+ fid = fopen(sprintf('%s%s', DirOutpost, nameExt), 'r');
 end
 %set up a default in case INI doesn't contain this information
 DirScripts = endWithBackSlash(sprintf('%sscripts', DirOutpost));

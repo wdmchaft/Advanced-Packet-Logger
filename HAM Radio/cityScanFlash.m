@@ -1,4 +1,4 @@
-function [err, errMsg, printedName, printedNamePath, form] = cityScanFlash(fid, msgFname, receivedFlag, pathDirs, printMsg, printer, outpost, h_field);
+function [err, errMsg, printed, form] = cityScanFlash(fid, msgFname, receivedFlag, pathDirs, printer, outpostHdg, outpostNmNValues, h_field);
 % !PACF!
 % # CITY-SCAN UPDATE FLASH REPORT 
 % # JS-ver. 3.3, 10-17-09
@@ -31,13 +31,12 @@ function [err, errMsg, printedName, printedNamePath, form] = cityScanFlash(fid, 
 % 17.: [yes]   ( yes/no)   Are you requesting any ADDITIONAL RESOURCES from the Operation Area?
 % #EOF
 
-[err, errMsg, modName, form, printedName, printedNamePath, printEnable, copyList, numCopies, ...
-    formField, h_field, textLine, fieldsFound, spaces, textToPrint]...
-  = startReadPACF(mfilename, receivedFlag, pathDirs, printMsg, 'CityScanFlash', msgFname, fid);
+[err, errMsg, modName, form, printed, printer, ...
+    formField, h_field, textLine, fieldsFound, spaces, textToPrint, addressee, originator]...
+  = startReadPACF(mfilename, receivedFlag, pathDirs, printer, 'CityScanFlash', msgFname, fid, outpostHdg);
 
 cityImpacted = '';
 emergDeclare = '';
-originator = '';
 
 while 1 % read & detect the field for each line of the entire message
   % clear the print line so the line will not be altered unless the field
@@ -56,8 +55,8 @@ while 1 % read & detect the field for each line of the entire message
   % Decode the information for the Packet Log:
   %ID/names as contained within the Outpost form of the message
   switch fieldID
-  case {'1a.', '1b.'} % City reporting, if not city - Entity Name 
-    form.subject = sprintf('%s %s;', form.subject, fieldText);
+  case {'1a.', '1b.'} % City reporting, if not city - Entity Name
+    form.subject = multiField('', form.subject, fieldText);
     fieldsFound = fieldsFound + 1; %two from here
   case '2.'
     form.date = fieldText ;
@@ -70,7 +69,7 @@ while 1 % read & detect the field for each line of the entire message
     if length(originator)
       originator = sprintf('%s ', originator);
     end
-    originator = sprintf('%s%s', originator,fieldText);
+    originator = sprintf('%s%s', originator, fieldText);
   case 'resource'
     %form.comment = fieldText ;
   case '8.' 
@@ -103,8 +102,16 @@ while 1 % read & detect the field for each line of the entire message
   otherwise
   end
 
-  if printEnable 
-    [err, errMsg, textToPrint] = fillFormField(fieldID, fieldText, formField, h_field, '', '') ;
+  if printer.printEnable 
+    [err, errMsg, textToPrint] = fillFormField(fieldID, fieldText, formField, h_field, '', '', outpostNmNValues) ;
+    if err
+      if err == 99
+        err = 0;
+        msgText = sprintf('>%s%s\r\nmessage: "%s".', mfilename, errMsg, msgFname);
+        logErr(msgText, outpostNmNValues)
+      else
+      end
+    end
   else % if printMsg 
     %If we are not printing and we've found all the desired fields
     %  presuming each fieldID occurs only once in the message
@@ -119,7 +126,23 @@ form.comment = sprintf('City impacted: %s. Emergency declared: %s', cityImpacted
 
 fcloseIfOpen(fid);
 
-addressee = 'Planning';
-if (~err & printEnable)
-  [err, errMsg, printedNamePath, printedName] = formFooterPrint(printer, printEnable, copyList, numCopies, h_field, formField, msgFname, originator, addressee, textToPrint, outpost, receivedFlag);
-end % if (~err & printEnable)
+if (~err & printer.printEnable)
+  addressee = 'Planning';
+  [err, errMsg, printed] = formFooterPrint(printer, h_field, formField, msgFname, originator, addressee, textToPrint, outpostHdg, receivedFlag);
+end % if (~err & printer.printEnable)
+%------------------------------
+function logErr(msgText, outpostNmNValues)
+  %just in case we cannot open the log file we'll use try/catch
+  try
+    [err, errMsg, date_time] = datevec2timeStamp(now);
+    fid = fopen(sprintf('%s%s_%s.log', outpostValByName('DirAddOns', outpostNmNValues), mfilename, date_time),'a');
+    if (fid < 1)
+      fid = fopen(sprintf('%s%s.log', '', mfilename),'a');
+    end % if (fid < 1)
+    if fid > 0
+      fprintf(fid, '\r\n%s %s', date_time, msgText);
+      fprintf('\n%s %s', date_time, msgText);
+      fclose(fid);
+    end % if fid > 0
+  catch
+  end

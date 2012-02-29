@@ -1,4 +1,4 @@
-function [err, errMsg, printedName, printedNamePath, form] = cityMAR(fid, msgFname, receivedFlag, pathDirs, printMsg, printer, outpost, h_field);
+function [err, errMsg, printed, form] = cityMAR(fid, msgFname, receivedFlag, pathDirs, printer, outpostHdg, h_field);
 % !PACF!
 % # CITY MUTUAL AID REQUEST 
 % # JS-ver. 1.1, 10-17-09
@@ -25,12 +25,9 @@ function [err, errMsg, printedName, printedNamePath, form] = cityMAR(fid, msgFna
 % briefing: [responder briefing time/place]
 % #EOF
 
-[err, errMsg, modName, form, printedName, printedNamePath, printEnable, copyList, numCopies, ...
-    formField, h_field, textLine, fieldsFound, spaces, textToPrint]...
-  = startReadPACF(mfilename, receivedFlag, pathDirs, printMsg, 'CityMAReq', msgFname, fid);
-
-addressee = '';
-originator = '';
+[err, errMsg, modName, form, printed, printer,  ...
+    formField, h_field, textLine, fieldsFound, spaces, textToPrint, addressee, originator]...
+  = startReadPACF(mfilename, receivedFlag, pathDirs, printer, 'CityMAReq', msgFname, fid, outpostHdg);
 
 while 1 % read & detect the field for each line of the entire message
   % clear the print line so the line will not be altered unless the field
@@ -92,7 +89,7 @@ while 1 % read & detect the field for each line of the entire message
     originator = fT;
   otherwise
   end
-  if printEnable 
+  if printer.printEnable 
     [err, errMsg, textToPrint] = fillFormField(fieldID, fieldText, formField, h_field, '', '') ;
   else % if printMsg 
     %If we are not printing and we've found all the desired fields
@@ -105,8 +102,8 @@ while 1 % read & detect the field for each line of the entire message
 end % while 1 % read & detect the field for each line of the entire message
 
 fcloseIfOpen(fid);
-addressee = 'Planning';
-if (~err & printEnable)
-  [err, errMsg, printedNamePath, printedName] = ...
-    formFooterPrint(printer, printEnable, copyList, numCopies, h_field, formField, msgFname, originator, addressee, textToPrint, outpost, receivedFlag);
+if (~err & printer.printEnable)
+  addressee = 'Planning';
+  [err, errMsg, printed] = ...
+    formFooterPrint(printer, h_field, formField, msgFname, originator, addressee, textToPrint, outpostHdg, receivedFlag);
 end % if (~err & printEnable)

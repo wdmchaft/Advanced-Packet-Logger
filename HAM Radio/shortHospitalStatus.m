@@ -1,4 +1,4 @@
-function [err, errMsg, printedName, printedNamePath, form] = shortHospitalStatus(fid, msgFname, receivedFlag, pathDirs, printMsg, printer, outpost, h_field);
+function [err, errMsg, printed, form] = shortHospitalStatus(fid, msgFname, receivedFlag, pathDirs, printer, outpostHdg, h_field);
 
 % !PACF!
 % # SHORT FORM HOSPITAL STATUS 
@@ -67,12 +67,9 @@ function [err, errMsg, printedName, printedNamePath, form] = shortHospitalStatus
 % q39_24: [psych bed 24]
 % #EOF
 
-[err, errMsg, modName, form, printedName, printedNamePath, printEnable, copyList, numCopies, ...
-    formField, h_field, textLine, fieldsFound, spaces, textToPrint]...
-  = startReadPACF(mfilename, receivedFlag, pathDirs, printMsg, 'hospitalStatusReportShort', msgFname, fid);
-
-addressee = '';
-originator = '';
+[err, errMsg, modName, form, printed, printer ...
+    formField, h_field, textLine, fieldsFound, spaces, textToPrint, addressee, originator]...
+  = startReadPACF(mfilename, receivedFlag, pathDirs, printer, 'hospitalStatusReportShort', msgFname, fid, outpostHdg);
 
 while 1 % read & detect the field for each line of the entire message
   % clear the print line so the line will not be altered unless the field
@@ -132,21 +129,21 @@ while 1 % read & detect the field for each line of the entire message
     fieldsFound = fieldsFound + 1;
   otherwise
   end
-  if printEnable 
+  if printer.printEnable 
     [err, errMsg, textToPrint] = fillFormField(fieldID, fieldText, formField, h_field, '', '') ;
-  else % if printMsg 
+  else % if printer.printEnable 
     %If we are not printing and we've found all the desired fields
     %  presuming each fieldID occurs only once in the message
     if (fieldsFound > 10)
       break
     end
-  end % if printMsg else
+  end % if printer.printEnable else
   textLine = fgetl(fid);
 end % while 1 % read & detect the field for each line of the entire message
 
 fcloseIfOpen(fid);
-addressee = 'Planning';
-if (~err & printEnable)
-  [err, errMsg, printedNamePath, printedName] = ...
-    formFooterPrint(printer, printEnable, copyList, numCopies, h_field, formField, msgFname, originator, addressee, textToPrint, outpost, receivedFlag);
+if (~err & printer.printEnable)
+  addressee = 'Planning';
+  [err, errMsg, printed] = ...
+    formFooterPrint(printer, h_field, formField, msgFname, originator, addressee, textToPrint, outpostHdg, receivedFlag);
 end % if (~err & printEnable)

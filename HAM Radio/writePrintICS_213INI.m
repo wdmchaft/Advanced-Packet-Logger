@@ -1,12 +1,20 @@
-function [err, errMsg] = writePrintICS_213INI(PathConfig, printEnableRec, printEnableSent, copies4recv, copies4sent, copies4sentFromPaper, HPL3, copies4DelvrRecp, printEnableDelvrRecp);
+function [err, errMsg] = writePrintICS_213INI(pathToINI, printEnableRec, printEnableSent, copies4recv, copies4sent, copies4sentFromPaper, HPL3, copies4DelvrRecp, printEnableDelvrRecp);
 %create the file
 
-[err, errMsg, fidINI]  = fOpenToWrite(sprintf('%sprint_ICS_213.ini', PathConfig),'w');
+[pathstr,name,ext,versn] = fileparts(pathToINI) ;
+if length(name)
+  uFile = name;
+else
+  uFile = 'processOutpostPacketMessages';
+end
+
+[err, errMsg, fidINI]  = fOpenToWrite(sprintf('%sprint_ICS_213.ini', pathToINI),'w');
 if err
   errMsg = sprintf('>%s%s', mfilename, errMsg);
   return
 end
 
+fprintf(fidINI, '%% print flags used by "%s"\r\n', uFile);
 fprintf(fidINI, '%% flag to enable/disable printing.  default is enable\r\n');
 fprintf(fidINI, '%% 0: printer disabled\r\n');
 fprintf(fidINI, '%% 1: pre-printed form in printer, printer enable for # of copies specified below\r\n');

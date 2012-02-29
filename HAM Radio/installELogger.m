@@ -21,14 +21,16 @@ uiwait(helpdlg(a,'Locating Outpost.ini'));
 inThisDirFlg = 0;
 while ~inThisDirFlg
   origDir = pwd;
-  cd(fPath)
+  if ~err
+    cd(fPath)
+  end
   [fname, DirOutpost] = uigetfile('outpost.ini','Location of Outpost.ini');
   cd(origDir)
   if isequal(fname,0) 
     %%%%%%%%%%%%%%%%%%%%
     %%%%%%%%%%%%%%%%%%%%
     fprintf('\n Installation aborted.');
-    errordlg('Installation aborted.','Abort','on')
+    uiwait(errordlg('Installation aborted.','Abort','on'))
     return
     %%%%%%%%%%%%%%%%%%%%
     %%%%%%%%%%%%%%%%%%%%
@@ -85,6 +87,7 @@ if ~debug
   err = dos(sprintf('"%sinstall_01.bat"', tempDir));
   if err
     fprintf('\r\nerror attempting run of "%sinstall_01.bat"', tempDir);
+    uiwait(errordlg(sprintf('Error attempting run of "%sinstall_01.bat"', tempDir),'Abort','on'))
     return
   end
 end
@@ -107,7 +110,26 @@ OutpostINItoScript(DirOutpost);
 DirAddOns = outpostValByName('DirAddOns', outpostNmNValues);
 DirAddOnsPrgms = outpostValByName('DirAddOnsPrgms', outpostNmNValues);
 DirArchive = outpostValByName('DirArchive', outpostNmNValues);
+if ~length(DirArchive)
+  a = dir(strcat(DirOutpost,'archive'));
+  if length(a)
+    DirArchive = strcat(DirOutpost,'archive\');
+  end
+end
 DirScripts = outpostValByName('DirScripts', outpostNmNValues);
+if ~length(DirScripts)
+  a = dir(strcat(DirOutpost,'scripts'));
+  if length(a)
+    DirScripts = strcat(DirOutpost,'scripts\');
+  end
+end
+if ~length(DirArchive) | ~length(DirScripts)
+  a = sprintf('\r\n*** Unable to determine all the directories used by Outpost: ');
+  a = sprintf('%s\r\n    Outpost has to be started at least once.', a);
+  a = sprintf('%s\r\n    Make sure you are chosing the correct Outpost directory.', a);
+  uiwait(errordlg(a,'Abort','on'))
+  return
+end
 
 %create the new directories - note that 'mkdirExt' will create the specified directory as well
 % as any missing directories in the tree above it.  For example, if we have
@@ -162,10 +184,16 @@ fprintf(fid, 'exit\r\n');
 fcloseIfOpen(fid);
 
 if ~debug
-  err = dos(strcat(tempDir,'install_01.bat'));
+  fprintf(sprintf('"%s"install_01.bat', tempDir));
+  err = dos(sprintf('"%s"install_01.bat', tempDir));
   if err
-    fprintf('\r\nerror attempting installation of "%sinstall_01.bat"', tempDir);
-    return
+    fprintf('\r\nerror attempting 2nd running of "%sinstall_01.bat": tryting again', tempDir);
+    err = dos(sprintf('"%sinstall_01.bat"', tempDir));
+    if err
+      fprintf('\r\nerror attempting 2nd running of "%sinstall_01.bat"', tempDir);
+      uiwait(errordlg(sprintf('Error attempting 2nd run of "%sinstall_01.bat"', tempDir),'Abort','on'))
+      return
+    end
   end
   fprintf('\nInstallation complete.')
   if ~strcmp(tempDir, fromDir)

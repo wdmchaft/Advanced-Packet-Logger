@@ -7,7 +7,7 @@ function [codeVersion, reply] = about_OutpostINItoScript_privat()
 
 codeVersion = 0.000000;
 if codeVersion
-  reply = sprintf('OutpostINItoScript Version %.3f (Debug) created 21-Jan-2011 09:25:48.', codeVersion);
+  reply = sprintf('OutpostINItoScript Version %.3f (Debug) created 12-Jan-2012 11:34:10.', codeVersion);
 else % if codeVersion
-  reply = sprintf('OutpostINItoScript created  (Debug)21-Jan-2011 09:25:48.');
+  reply = sprintf('OutpostINItoScript created  (Debug)12-Jan-2012 11:34:10.');
 end % if codeVersion

@@ -23,6 +23,12 @@ function varargout = dispNghbrhdSmry(varargin)
 
 % properly initialize "handles.neighborhoodDate" which isn't used for anything . . . yet
 
+
+
+% length(logged)
+% logged(length(logged)).fpathName
+% 
+
 %version number tracked in dispNghbrhdSmry_OpeningFcn via "handles.codeVersion"
 err = 0;
 errMsg = '';
@@ -139,16 +145,8 @@ end
 % --------------------------------------------------------------------
 % --------------------------------------------------------------------
 function varargout = dispNghbrhdSmry_OpeningFcn(varargin)
-global debugEnable
 [err, errMsg, modName] = initErrModName(strcat(mfilename, '(dispNghbrhdSmry_OpeningFcn)'));
 
-fid = fopen(strcat(mfilename,'_debug.txt'),'r');
-if (fid > 0)
-  debugEnable = 1;
-  fclose(fid);
-else
-  debugEnable = 0;
-end
 
 %want only one instance but "reuse" literally re-uses the figure if it is open &
 % we create certain values in the original figure in "guide", the figure editor,
@@ -191,16 +189,26 @@ handles = guihandles(figure1);
 handles.codeVersion = 1.01;
 [codeName, codeVersion, codeDetail] = getCodeVersion(handles);
 fprintf('\r\nCode: %s, version %s %s', codeName, codeVersion, codeDetail);
+% set the background of the title banner to match the figure's color
+set(handles.textTitle, 'BackgroundColor', get(figure1, 'color'))
+fid = fopen(strcat(mfilename,'_debug.txt'),'r');
+if (fid > 0)
+  handles.debugEnable = 1;
+  fclose(fid);
+else
+  handles.debugEnable = 0;
+end
 
 fprintf('\r\n');
 fprintf('\r\n*** you may minimize this window. Do NOT close ****');
 fprintf('\r\n*** you may minimize this window. Do NOT close ****');
-fprintf('\r\n*** To close: exit the window "Packet Log Monitor ****');
+fprintf('\r\n*** To close: exit the window "DA Summary ****');
 fprintf('\r\n');
 
 handles.logPath = '';  
 handles.logPathName  = '';
 handles.logCoreName = '' ;
+handles.lastLogLineProcsd = 0 ;
 logPathPassedIn = 0;
 logPathNNamePassedIn = 0;
 if (nargin > 0)
@@ -230,8 +238,8 @@ if (nargin > 0)
   end % if length(ext) else
 end % if (nargin > 0)
 
-if debugEnable
-  fid = fopen('\displayCount.log','a');
+if handles.debugEnable
+  fid = fopen(sprintf('\\%s.log', mfilename),'a');
   fprintf(fid,'handles set\r\n');
   fclose(fid);
 end
@@ -253,8 +261,8 @@ if err
 else
   outpostOK = 1;
 end
-if debugEnable
-  fid = fopen('\displayCount.log','a');
+if handles.debugEnable
+  fid = fopen(sprintf('\\%s.log', mfilename),'a');
   fprintf(fid,'Outpost OK: %i\r\n', outpostOK);
   fclose(fid);
 end
@@ -264,67 +272,23 @@ if outpostOK
   % location of  this program, the logging program (processOPM) and the semaphore files that are not in the
   %  log's directory
   handles.workingDir = outpostValByName('DirAddOnsPrgms', outpostNmNValues);
+  handles.DirAddOns = outpostValByName('DirAddOns', outpostNmNValues);
   
   %location of pac-forms
   handles.DirPF = endWithBackSlash(outpostValByName('DirPF', outpostNmNValues));
   handles.opCall = outpostValByName('StationID', outpostNmNValues);
   handles.outpostNmNValues = outpostNmNValues;
 else
-  handles.workingDir = sprintf('%sAddOns\\Programs\\', endWithBackSlash(pwd)) ;
+  handles.DirAddOns = sprintf('%sAddOns\\', endWithBackSlash(pwd)) ;
+  handles.workingDir = sprintf('%sPrograms\\', handles.DirAddOns ) ;
   handles.DirPF = 'c:\pacforms\';
   handles.opCall = '' ;
   handles.outpostNmNValues = '';
 end
-nameForStore = sprintf('%s%s.mat', handles.workingDir, mfilename);
+nameNoExtForStore = sprintf('%s%s', outpostValByName('DirAddOns', outpostNmNValues), mfilename);
+nameForStore = strcat(nameNoExtForStore, '.mat');
 
-% configuration files usually .ini
-%the configuration files are in the directory above the program's directory
-a = findstrchr('\', handles.workingDir);
-handles.configDir = handles.workingDir(1:a(length(a)-1));
-
-% Printers:
-% Ideally we'd like to have the program be able to switch from Portrait to Landscape,
-%   know or specify the character-per-inch, margins, etc.  The purposes include 
-%   automatically:
-%   1) being able to print to exact locations on a pre-printed form which will be
-%      in Portrait mode. (This is from another program which likely will be running
-%      concurrently which means Windows' Default cannot be set properly for both this
-%      case and the Landscape case.)  A variant on this is to print on a blank sheet 
-%      of paper in portrait mode.
-%   2) print the packet log in Landscape, wrapping lines as necessary.
-%   3) being able to perform a manually activated print of a message - this is a
-%      trival problem because the settings can be changed by the user as needed.
-%
-% local printers can be accessed directly for LPT1: and perhaps for USB as well.
-%   This permits direct configuration commands for font, pitch, orientation, etc but
-%   may require printer brand-specific commands.  The killer limitation is the inability
-%   to easily access a networked printer.  The implementation I've gotten working for 
-%   LPT1: is to print text to a file and then copy to the printer.
-% accessing a printer through Windows is most likely limited to the "default printer"
-%   set up to what ever the user has defined as the default conditions.
-
-% User choices:
-% 1) semi-automatic printing: program brings up notepad & user takes it from there
-% 2) automatic printing through notepad
-% 3) automatic printing through a 3rd party program, command line as loaded from a file
-% ====
-% For now, let's presume local printer, LPT1:, HP compatible command set (check out Canons)
-% and use portrait/landscape etc with command sequences.
-
-%Some todos: 
-%  * ics213 on blank paper (need to know where to put field headings);
-%  * processOutpost... : control file to know what type of paper is loaded into the printer: plain, preprinted, etc
-%  *  (same)   saving log to additional locations such as network, usb drives, etc.  Would be good to have
-%     action log to record the activities.  Of interest in situation where a usb drive is removed for a
-%     period of time and then re-installed.
-%  * method to enter incident name
-%  * option to name log on incident name instead of date
-%  * option to specify starting date (&time?) for logged events such as from now on, N hours before now & on,
-%    today, etc.
-%  * program that will open packet log display and then activate the monitor
-%  * might be good to use different colors on the Packet Log Monitor button so user knows when it is not active.
-%  * indicate when log lines are > printer line width & then invoke line wrap?
-%  * timed auto printed of log
+handles.configDir = handles.DirAddOns;
 
 % set up default values
 
@@ -450,8 +414,8 @@ handles.dispColFName = 'Default';
 %check if conditions from previous run are exist (includes previous GUI position)
 % some of these may override the deaults of above
 fidStore = fopen(nameForStore, 'r');
-if debugEnable
-  fid = fopen('\displayCount.log','a');
+if handles.debugEnable
+  fid = fopen(sprintf('\\%s.log', mfilename),'a');
   fprintf(fid,'fidStore %i\r\n', fidStore);
   fclose(fid);
 end
@@ -460,7 +424,7 @@ handles.viewDetail = 1;
 if (fidStore > 0)
   fclose(fidStore);
   load(nameForStore);
-  set(figure1, 'position', FigMPposition) ;
+  % % set(figure1, 'position', FigMPposition) ;
   % there is a chance the position is not from this computer so
   %let's make sure it is visible.  (How not visible?  If the entire
   %directory was copied from another computer with higher resolution
@@ -491,6 +455,7 @@ end % if (fidStore > 0) else
 % % % handles.initPosLBAllStations = get(handles.listboxAllStation,'position');
 % % % handles.posScoreBrd = get(handles.listboxScoreboard,'position');
 % % % handles.posScoreSumm = get(handles.listboxScoreboardSumm,'position');
+handles.nameNoExtForStore = nameNoExtForStore;
 handles.nameForStore = nameForStore;
 set(figure1,'visible','on');
 
@@ -508,10 +473,13 @@ a = findstrchr('_', date_time);
 tm = date_time(a+1:length(date_time));
 %started here & refined line 3 lines down by adding the time as a suffix:
 handles.semaphoreCoreName = 'PkLgMonitor' ;
-handles.programRunningSimpleExt = sprintf('%s%s_on.txt', handles.workingDir, handles.semaphoreCoreName) ;
+handles.programRunningSimpleExt = sprintf('%s%s_on.txt', handles.DirAddOns, handles.semaphoreCoreName) ;
 %modify semaphoreCoreName: add the time as a suffix to make it unique
 handles.semaphoreCoreName = sprintf('%s%s_', handles.semaphoreCoreName, tm) ;
-handles.programRunning = sprintf('%s%s', handles.workingDir, handles.semaphoreCoreName) ;
+handles.programRunning = sprintf('%s%s', handles.DirAddOns, handles.semaphoreCoreName) ;
+
+handles.flagFname = strcat(nameNoExtForStore,'_lastFlags.mat');
+handles.flagFileList = delFilesFromLastRun(handles.flagFname);
 %write the unique time stamped semaphore flag used by processOPM (do we really need a unique one? AR Jan 2010)
 % "0": indicates monitor loop is not running so auto-updating of copies isn't active
 writePrgmRunning(handles, 0) ;
@@ -525,33 +493,40 @@ end
 % Make sure both types of lists of copy location exist even if empty:
 %   if they don't exist, these calls will cause them to be created & they will include usage instructions 
 %List when monitoring a remote computer:
-[err, errMsg, handles.pathsTologCopies] = readProcessOPM_Logs(handles.configDir,...
+[err, errMsg, handles.pathsTologCopies] = readProcessOPM_Logs(handles.DirAddOns,...
   'network_PkLgMonitor_logs.ini',sprintf('This file is used by "%s" when monitoring a Packet Log on a network.', mfilename));
 %List for this computer
-[err, errMsg, handles.pathsTologCopies] = readProcessOPM_Logs(handles.configDir);
+[err, errMsg, handles.pathsTologCopies] = readProcessOPM_Logs(handles.DirAddOns);
 %The active list is opened in "readNDspPckt"
 handles.pathsTologCopies = {};
 
-%load the alias list
-[handles.tacAlias, handles.tacCall, txtLineArray, errMsg, handles.tacCallFName] ...
-  = readTacCallAlias(outpostValByName('DirAddOns', outpostNmNValues));
+%load the alias list [tacAlias, tacCall, txtLineArray, errMsg, fname, tacType]
+[handles, errMsg, errMsgLong] = loadDASummTacCalls(handles); 
 if length(errMsg)
-  a = {''};
-  a(4) = {errMsg};
-  a(5:7) = {''};
-  a(8) = {'You need to correct this issue & then restart this program'};
-  a(9) = {'If available, the "packetLogSettings" can be used to manually create that list.'};
-  set(handles.listboxByNeighborhood,'string', a,'visible', 'on', 'enable','inactive' ) ;
+  set(handles.listboxByNeighborhood,'string', errMsgLong,'visible', 'on', 'enable','inactive' ) ;
+  err = 1 ;
+  if ~(handles.closeRequest)
+    %Wait for the callbacks to be run and the window to be dismissed
+    uiwait(figure1)
+  end
+  CloseRequest(handles)
+  varargout{3} = figure1;
+  varargout{1} = err;
+  varargout{2} = strcat(modName, errMsg);
+  %%%%%%%%
+  return
+  %%%%%%%%
 else
+  [handles, err, errMsg] = readTacFriendAbbrev(handles, handles.DirAddOns);
   set(handles.listboxByNeighborhood,'string', {},'visible', 'off') ;
+  handles = positHeaders(handles);
+  handles = buildNeighborDisp(handles);
 end
-handles = learnMTVcertTacInfo(handles);
-handles = positHeaders(handles);
-handles = buildNeighborDisp(handles);
+
 
 %load the settings regarding printing the log
 [err, errMsg, handles.logPrtEnable, handles.logPrt_minuteInterval, handles.logPrt_mnmToPrt, handles.logPrt_msgNums]...
-  = readLogPrintINI(outpostValByName('DirAddOns', outpostNmNValues));
+  = readLogPrintINI(handles.DirAddOns);
 %   page numbering to be displayed on hardcopy of log
 handles.logPrintFirstPageNum = 1;
 %  line of data from log that the printing is to
@@ -641,7 +616,11 @@ set(handles.togglebuttonMonitorLog,'value', 1)
 %tell the code the button has been pushed: this call will not end until/unless the user releases the button
 % or closes the figure
 handles = guidata(handles.figure1);
+set(handles.figure1, 'ResizeFcn', '')
 drawnow
+handles.figLastPos = get(figure1, 'Position');
+guidata(handles.figure1, handles)
+set(handles.figure1, 'ResizeFcn', 'dispNghbrhdSmry(''ResizeFcn'',gcbo,[],guidata(gcbo))')
 %we'll stay in the montior loop until the operator turns off monitoring or attemps to close the figure
 dispNghbrhdSmry('togglebuttonMonitorLog_Callback', handles.togglebuttonMonitorLog,[],handles);
 
@@ -758,11 +737,11 @@ end
 %move highlight to first line: new load of log
 set(handles.listboxByNeighborhood,'value',1)
 if (1 == findstrchr('\\', handles.logPath))
-  [err, errMsg, handles.pathsTologCopies] = readProcessOPM_Logs(handles.configDir,...
+  [err, errMsg, handles.pathsTologCopies] = readProcessOPM_Logs(handles.DirAddOns,...
     'network_PkLgMonitor_logs.ini','This file is used by "%s" when monitoring a Packet Log on a network.');
 else
   %log is from a local drive: read the locations for the copies of the logs:
-  [err, errMsg, handles.pathsTologCopies] = readProcessOPM_Logs(handles.configDir);
+  [err, errMsg, handles.pathsTologCopies] = readProcessOPM_Logs(handles.DirAddOns);
 end
 % disable backing up the packet log itself - several places required
 handles.pathsTologCopies = {};
@@ -876,6 +855,13 @@ displayLog(handles)
 if any(handles.neighUpdate(:))
   [err, errMsg] = writeSummaryFile(handles);
 end
+% flag file to indicate we're done parsing. dispNghbrhdSmry will now update the log we're monitoring
+if findstrchr('packetdemologs', lower(handles.logPath))
+  fid = fopen(strcat(handles.logPath, 'flag.txt'),'w');
+  fprintf(fid,'debug');
+  fcloseIfOpen(fid);
+end
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function [textBack] = sameLength(newText, lengthNeeded, spaces, resetCol, justify);
 %pads "newText" to be the required length.  If newText is longer than
@@ -942,7 +928,7 @@ if ~(ismember(val, handles.nonLogLines))
   val = val - length(find(handles.nonLogLines < val));
   % increase the index by the number of logged lines that aren't being displayed
   val = val + length(find(handles.noDispLogLines < val));
-  msgPathName = repathIfNet(handles.logged(handles.listSortedNdx(val),find(ismember(handles.dispFieldNms,'fpathName'))), handles);
+  msgPathName = repathIfNet(handles.logged(handles.listSortedNdx(val),find(ismember(handles.dispFieldNms,'fpathName'))), handles.logPath);
   %scan to see if the window is already open
   if length(find(ismember(handles.h_displayTextPathName, msgPathName)))
     a = find(ismember(handles.h_displayTextPathName, msgPathName)) ;
@@ -1148,7 +1134,7 @@ if ~(ismember(val, handles.nonLogLines))
   outText = get(handles.pushbuttonOpenPACF,'string');
   %rename the button because this process takes a bit & therefore operator needs to know WIP
   set(handles.pushbuttonOpenPACF,'string','working');
-  msgPathName = repathIfNet(handles.logged(handles.listSortedNdx(val),find(ismember(handles.dispFieldNms,'fpathName'))), handles);
+  msgPathName = repathIfNet(handles.logged(handles.listSortedNdx(val),find(ismember(handles.dispFieldNms,'fpathName'))), handles.logPath);
   [err, errMsg] = viewPACF(handles.DirPF, handles.workingDir, msgPathName);
   %all done: restore the button name
   set(handles.pushbuttonOpenPACF,'string',outText);
@@ -1354,6 +1340,7 @@ handles.logCoreName = extractCoreName(fname); %local function
 handles.logPathName = sprintf('%s%s', handles.logPath, fname); 
 %if log is from a network drive
 handles = resetDisplay(handles);
+handles.lastLogLineProcsd = 0 ;
 guidata(handles.figure1, handles);
 set(handles.listboxByNeighborhood,'val',1);
 % ------------- ^^^^^^^^ function choseLog ^^^^^^^
@@ -1503,7 +1490,6 @@ handles.logPrintStartLogLine = 1;
 % % end % for loopNdx = 1:2
 % --------------------------------------------------------------------
 function varargout = togglebuttonMonitorLog_Callback(h, eventdata, handles, varargin)
-global debugEnable
 
 %Loops to monitor the date-time of the Log file.  When the Log is updated, this
 % routing will re-load and display the updated file as well as providing a visual
@@ -1551,9 +1537,11 @@ if ~val
   return
 end
 %% debug
-% fid = fopen('F:\MTV_radioRoom_101107\SCCo Packet on cmv13706\logs\flag.txt','w');
-% fprintf(fid,'debug');
-% fcloseIfOpen(fid);
+if findstrchr('packetdemologs', lower(handles.logPath))
+  fid = fopen(strcat(handles.logPath, 'flag.txt'),'w');
+  fprintf(fid,'debug');
+  fcloseIfOpen(fid);
+end
 % % fidTemp = fopen('temp.txt','w');
 % % fclose(fidTemp);
 while 1
@@ -1620,7 +1608,7 @@ while 1
     logNew = ~strcmp(last_logPathName, handles.logPathName);
     if (logUpdated | logNew)
       %log has been updated!
-      if debugEnable
+      if handles.debugEnable
         if strcmp(logFileInfo(1).date, handles.header.logFDate) & ~strcmp(logFileInfo(1).bytes, handles.header.bytes)
           fprintf('\nLog date has not changed but size has changed!');
         end
@@ -1924,91 +1912,6 @@ else
   delete(varargin{2})
 end
 % --------------------------------------------------------------------
-function new_filePathName = repathIfNet(filePathName, handles);
-if iscell(filePathName)
-  filePathName = char(filePathName);
-end
-isNetLog = (1 == findstrchr('\\', handles.logPath));
-%Renames the path of the passed in message file iff the log is over a network
-%if this log is coming over a network, the message file names in the log will
-% be refering to the local drives on the networked computer & cannot be directly 
-% used here. Various sharing is supporting and this code will keep trying until
-% one of them reaches the message or all attempts have failed.  (Error reporting occurs elsewhere)
-%
-%In the exampels included here, the log path is capatilized just for emphasis and clarity
-%1) We'll attempted the simplest network access where the share for the messages is at the drive level,
-% both the log and the messages are on the same machine, and the share name
-% is the drive letter of the messages: example "c:" is shared as "c"
-%  (note this can be one or two shares)
-%  drop the ":" from the drive letter & add the net path as the prefix
-% message:   c:\dirName\.... 
-% log:  \\<NETNAME>\DIFFERENT DIR NAME\LOGS\<log name>
-%   newPathName = \\<NETNAME>\c\dirName\....
-%
-%2) If this doesn't work, we'll try to find a directory in the filePath that
-%  is also in the path to the log & make the new path up to that point
-%  the same as the log's path
-%This works with a single Share or dual share as long as the log & files have a common directory level
-% message  c:\<dir 1>\<dir 2>\dirname\archive\InTray\<file name> 
-% log  \\<NETNAME>\dirName\logs\<log name>
-%   newPathName = \\<NETNAME>\dirName\archive\InTray\<file name>
-%
-%3) If that also doesn't work, we'll try  \\<NETNAME>\archive\InTray\<file name>
-%This works with two shares, one for the log and one for the files but only when
-%  the file share for the messages is at "Archive" and uses that as the share name
-% message  c:\<dir 1>\<dir 2>\...\dirname\archive\InTray\<file name> 
-% log  \\<NETNAME>\dirName\logs\<log name>
-%   newPathName = \\<NETNAME>\archive\InTray\<file name>
-%
-%4) If that also doesn't work, we'll try  \\<NETNAME>\<DirArchive>\InTray\<file name>
-%This works with two shares, one for the log and one for the files but only when
-%  the share for the messages is at <DirArchive> and uses that as the share name
-%  where <DirArchive> is the archive directory used by Outpost & defined in outpost.ini
-%  (script and code is hard-wired for the messages to be one directory under <DirArchive>
-%  regardless of where <DirArchive> is located.
-% message  c:\<dir 1>\<dir 2>\....\dirname\<DirArchive>\InTray\<file name> 
-% log  \\<NETNAME>\dirName\logs\<log name>
-%   newPathName = \\<NETNAME>\<DirArchive>\InTray\<file name>
-
-if isNetLog
-  bSlashAt = findstrchr('\',handles.logPath);
-  % get  "\\<netname>\"
-  nameOnNet = handles.logPath(bSlashAt(1):bSlashAt(3));
-  a = findstrchr(':',filePathName); 
-  %1) single share at the drive level
-  new_filePathName = sprintf('%s%s%s', nameOnNet, filePathName(1:a(1)-1), filePathName((a(1)+1):length(filePathName)));
-  if ~exist(new_filePathName)
-    % 2) single Share for log & files at a common directory level
-    %determine the first/highest directory named in the logPath & then find that name in the file path
-    % log path: \\<netname>\<first dir>\
-    highDirLog = handles.logPath(bSlashAt(3)+1:bSlashAt(4)-1);
-    a = findstrchr(lower(highDirLog), lower(filePathName));
-    if a
-      new_filePathName = sprintf('%s%s', nameOnNet, filePathName((a(1)):length(filePathName)));
-    end
-    if ~exist(new_filePathName) %2nd
-      %two shares, one for the log and one for the files but only when
-      %  the file share is at "Archive" and uses that as the share name 
-      a = findstrchr('archive', lower(filePathName));
-      if a
-        new_filePathName = sprintf('%s%s', nameOnNet, filePathName((a(1)):length(filePathName)));
-      end
-      if ~exist(new_filePathName) %3rd
-        %two shares, one for the log and one for the messages but only when
-        %  the messages share is at Outpost's DirArchive and uses that as the share name 
-        % path name to the message is hard-coded to end with the directory 
-        %       ...\<DirArchive>\InTray\<message name> or ...\<DirArchive>\SentTray\<message name>
-        a = findstrchr('\', lower(filePathName));
-        if a
-          new_filePathName = sprintf('%s%s', nameOnNet, filePathName(((a(length(a)-2))+1):length(filePathName)));
-        end
-      end %if ~exist(new_filePathName) %3rd
-    end %if ~exist(new_filePathName) %2nd
-  end %if ~exist(new_filePathName)
-else
-  new_filePathName = filePathName;
-end %if isNetLog
-% --------------------------------------------------------------------
 function [beginPathName, beginEndPathName] = shortPathName(fullPathName); 
 %Just the drive or network designator for the file
 % c:\...\<name.ext>
@@ -2074,12 +1977,15 @@ h_fileOpen = uimenu(h_fileMenu,'Label', 'Exit', ...
   'Callback', 'dispNghbrhdSmry(''figure1_CloseRequestFcn'',gcbo,[],guidata(gcbo))'...
   );
 %============= EDIT menu ==============
-% % %"root" menu item because "handles.figure1"
-% % h_editMenu = uimenu(handles.figure1,'Label', 'Edit', 'accelerator','e', ...
-% %   'Callback', 'dispNghbrhdSmry(''edit_Callback'',gcbo,[],guidata(gcbo))'...
-% %   );
-% % handles.h_editMenu = h_editMenu;
-% % %Edit menu sub-item
+%"root" menu item because "handles.figure1"
+h_editMenu = uimenu(handles.figure1,'Label', 'Edit', 'accelerator','e', ...
+  'Callback', 'dispNghbrhdSmry(''edit_Callback'',gcbo,[],guidata(gcbo))'...
+  );
+handles.h_editMenu = h_editMenu;
+%Edit menu sub-item
+h_editLoad = uimenu(h_editMenu,'Label', 'Edit Abbreviation', ...
+  'Callback', 'dispNghbrhdSmry(''editAbbrev_Callback'',gcbo,[],guidata(gcbo))'...
+  );
 % % h_editLoad = uimenu(h_editMenu,'Label', 'Load column order layout', ...
 % %   'Callback', 'dispNghbrhdSmry(''editLoadOrdr_Callback'',gcbo,[],guidata(gcbo))'...
 % %   );
@@ -2112,10 +2018,10 @@ h_fileOpen = uimenu(h_fileMenu,'Label', 'Exit', ...
 % % guidata(handles.figure1, handles);
 
 %============= SETTINGS menu ==============
-% % %"root" menu item because "handles.figure1"
-% % h_settingsMenu = uimenu(handles.figure1,'Label', 'Settings', ...
-% %   'Callback', 'dispNghbrhdSmry(''settings_Callback'',gcbo,[],guidata(gcbo))'...
-% %   );
+%"root" menu item because "handles.figure1"
+h_settingsMenu = uimenu(handles.figure1,'Label', 'Settings', ...
+  'Callback', 'dispNghbrhdSmry(''settings_Callback'',gcbo,[],guidata(gcbo))'...
+  );
 
 %============= HELP menu ==============
 %"root" menu item because "handles.figure1"
@@ -2128,7 +2034,7 @@ h_helpAbout = uimenu(h_helpMenu,'Label', 'About', 'accelerator','a', ...
   );
 % --------------------------------------------------------------------
 function settings_Callback(h, eventdata, handles, varargin)
-packetLogSettings('logPrint');
+packetLogSettings('messagePrint', mfilename);
 
 % --------------------------------------------------------------------
 function createRecentFileMenu(handles)
@@ -2170,7 +2076,7 @@ a = dir(strcat(mfilename,'.m'));
 codeDetail = sprintf('%s \n(running %s.m file: %s)', codeDetail, mfilename, a(1).date);
 userCancel = 1;
 %#ENDIF
-codeDetail = sprintf('%s \n\nCopyright 2009-2010 Andy Rose  KI6SEP\nAll rights reserved.', codeDetail);
+codeDetail = sprintf('%s \n\nCopyright 2009-2011 Andy Rose  KI6SEP\nAll rights reserved.', codeDetail);
 % --------------------------------------------------------------------
 function varargout = helpAbout_Callback(h, eventdata, handles, varargin)
 [codeName, codeVersion, codeDetail] = getCodeVersion(handles);
@@ -2236,6 +2142,14 @@ h_.dispColHdg = handles.dispColHdg;
 h_.dispColOrdr = handles.dispColOrdr;
 
 [err, errMsg] = displaySaveOrder(path, h_);
+% --------------------------------------------------------------------
+function varargout = editAbbrev_Callback(h, eventdata, handles, varargin)
+[changed, rowNames] = editList(handles);
+if changed
+  handles.rowNames = rowNames;
+  [handles, err, errMsg] = writeTacFriendAbbrev(handles, handles.DirAddOns);
+end % if changed
+% ----------------- function editAbbrev_Callback ---------------------
 % --------------------------------------------------------------------
 function varargout = editLoadOrdr_Callback(h, eventdata, handles, varargin)
 
@@ -2308,163 +2222,47 @@ end
 
 % --------------------------------------------------------------------
 function varargout = togglebuttonPrint_Callback(h, eventdata, handles, varargin)
-
-
-
-
 % --------------------------------------------------------------------
 function varargout = togglebuttonPrintPACF_Callback(h, eventdata, handles, varargin)
 %not used & may never be used - place holder
-
-
-
 % --------------------------------------------------------------------
 function varargout = editFire_Total_Callback(h, eventdata, handles, varargin)
-
-
-
-
 % --------------------------------------------------------------------
 function varargout = editGasTotal_Callback(h, eventdata, handles, varargin)
-
-
-
-
 % --------------------------------------------------------------------
 function varargout = editWaterTotal_Callback(h, eventdata, handles, varargin)
-
-
-
-
 % --------------------------------------------------------------------
 function varargout = editElecTotal_Callback(h, eventdata, handles, varargin)
-
-
-
-
 % --------------------------------------------------------------------
 function varargout = editChemTotal_Callback(h, eventdata, handles, varargin)
-
-
-
-
 % --------------------------------------------------------------------
 function varargout = editBLiteTotal_Callback(h, eventdata, handles, varargin)
-
-
-
-
 % --------------------------------------------------------------------
 function varargout = editBModerateTotal_Callback(h, eventdata, handles, varargin)
-
-
-
-
 % --------------------------------------------------------------------
 function varargout = editBHeavyTotal_Callback(h, eventdata, handles, varargin)
-
-
-
-
 % --------------------------------------------------------------------
 function varargout = editPeopImmTotal_Callback(h, eventdata, handles, varargin)
-
-
-
-
 % --------------------------------------------------------------------
 function varargout = editPeopDlydTotal_Callback(h, eventdata, handles, varargin)
-
-
-
-
 % --------------------------------------------------------------------
 function varargout = editPeopTrapTotal_Callback(h, eventdata, handles, varargin)
-
-
-
-
 % --------------------------------------------------------------------
 function varargout = editPeopMorgTotal_Callback(h, eventdata, handles, varargin)
-
-
-
-
 % --------------------------------------------------------------------
 function varargout = editRoadAccTotal_Callback(h, eventdata, handles, varargin)
-
-
-
-
 % --------------------------------------------------------------------
 function varargout = editRoadNoAccTotal_Callback(h, eventdata, handles, varargin)
-
-
-
-
 % --------------------------------------------------------------------
 function varargout = editNeigPrctTotal_Callback(h, eventdata, handles, varargin)
-
-
-
-
 % --------------------------------------------------------------------
 function varargout = editDataUpdateTotal_Callback(h, eventdata, handles, varargin)
-
-
-
-
 % --------------------------------------------------------------------
 function varargout = listbox4_Callback(h, eventdata, handles, varargin)
-
-
-
-
 % --------------------------------------------------------------------
 function varargout = edit46_Callback(h, eventdata, handles, varargin)
-
-
-
-
 % --------------------------------------------------------------------
 function varargout = listboxByNeighborhood_Callback(h, eventdata, handles, varargin)
-
-% --------------------------------------------------------------------
-function handles = learnMTVcertTacInfo(handles)
-% Call this after handles.tacCall & handles.tacAlias have been loaded
-% Returns an index array to the elements of these two arrays for
-%  the CERTs in Mountain View.  Rule: tacCall must start MTV &
-%  "CERT" must be in the tacAlias.  The index array presents the
-%  information in alphabetical order for the tacAlias.
-%     handles.mtvCERTNdx.  usage: handles.tacCall(handles.mtvCERTNdx)
-% Reads the first line of the listbox to learn the positions of
-%  the columns.
-%     handles.listDelimsAt: locations of the column delimiters
-%     handles.listCommasAt: locations of the thousand's comma for each column
-% Retuns handles as well as re-saving it via "guidata"
-
-handles.mtvCERTNdx = [];
-mtvCERTalpha = {};
-for itemp = 1:length(handles.tacCall)
-  if (findstrchr(char(handles.tacCall(itemp)), 'MTV') == 1)
-    if (findstrchr(char(handles.tacAlias(itemp)), 'CERT') )
-      Ndx = length(handles.mtvCERTNdx)+1;
-      handles.mtvCERTNdx(Ndx) = itemp;
-      %build a temp list for alphabetizing:
-      if (findstrchr(lower(char(handles.tacAlias(itemp))), 'the') == 1)
-        % strip off any leading "the"
-        a = char(handles.tacAlias(itemp));
-        mtvCERTalpha(Ndx) = {a(5:length(a))};
-      else %if (findstrchr(lower(char(handles.tacAlias(itemp))), 'the') == 1)
-        mtvCERTalpha(Ndx) = handles.tacAlias(itemp);
-      end % if (findstrchr(lower(char(handles.tacAlias(itemp))), 'the') == 1) else
-    end % if (findstrchr(char(handles.tacAlias(itemp)), 'CERT') )
-  end % if (findstrchr(char(handles.tacCall(itemp)), 'MTV') == 1)
-end % for itemp = 1:length(handles.tacCall)
-%sort alphabetically
-[a, Ndx] = sort(mtvCERTalpha);
-handles.mtvCERTNdx = handles.mtvCERTNdx(Ndx);
-guidata(handles.figure1, handles);
 % --------------------------------------------------------------------
 function newLine = updateNumericCol(oldLine, newVal, col, handles)
 %col zero is the neighborhood name column, 1 is the first column containing numeric information
@@ -2487,238 +2285,6 @@ else
   spaces(1:lengthNeeded) = ' ';
   newLine = sprintf('%s%s%s', oldLine(1:handles.listDelimsAt(col)), spaces, numstr);
 end
-% --------------------------------------------------------------------
-function [handles] = neighSummFromLog(handles, logged)
-
-searchKey = upper({'Fires','Gas Leak','Water Leak','Electrical','Chemical','Light','Mod',...
-    'Heavy','Immediate','Delayed','Trapped','Morgue','Access','No access','surveyed'}) ;
-% % % the following is set for "fires-out". Activate handles list in local function "positHeaders"
-% % searchKey = upper({'Fires','','Gas Leak','Water Leak','Electrical','Chemical','Light','Mod',...
-% %     'Heavy','Immediate','Delayed','Trapped','Morgue','Access','No access','surveyed'}) ;
-%%%%%%%%%%%%%%%%%%%% MAKE SURE above list has "No access" after "Access" %%%%%%%%%%%%%%%%%%%%%
-
-latestUpdateNdx = find(handles.editTotals == handles.editLatestUpdate);
-
-%want to track any updates in this load from any earlier unacknowlegded updates
-handles.neighUpdateAmt(find(handles.neighUpdateAmt >0)) = 2;
-handles.neighUpdate(find(handles.neighUpdate>0)) = 2;
-
-needToFindNeigh([1:length((handles.mtvCERTNdx))]) = 1;
-%search backwards through the log so we'll load the newest/latest report.
-for logNdx = length(logged):-1:1
-  from = upper(logged(logNdx).from);
-  %truncate the "from" address before the "@"
-  a = findstrchr('@', from);
-  if a
-    from = from(1:a(1)-1);
-  end
-  %     if findstrchr(logged(logNdx).subject,'SFA-01_O/P_ICS213_Neighborhood Summary for Saint Francis Acres')
-  %   if findstrchr(logged(logNdx).logMsgNo,'255P')
-  %         fprintf('\nahdskjasdhk');
-  %       end
-  
-  % clear data
-  neighborhoodDate = '';
-  foundDate = 0;
-  neighborhoodAmts(1:size(handles.neighborhoodAmts,2) ) = 0;
-  foundColNdx = [];
-  thisCERT = find(ismember(handles.tacCall(handles.mtvCERTNdx(find(needToFindNeigh))), from));
-  if length(thisCERT)
-    a = find(needToFindNeigh);
-    thisCERT = a(thisCERT);
-  end
-  %if the tactical call in the "from" field wasn't on the authorized list,
-  %  it might be in the message form itself in the "from location".  This is the situation for Summaries
-  %  which have been received in the EOC by voice.
-  %read the message...
-  new_filePathName = repathIfNet(logged(logNdx).fpathName, handles);
-  fidMsg = fopen(new_filePathName,'r');
-  if (fidMsg < 1)
-    % if the directory to the log is not the directory Outpost was using,
-    %  the files may have been relocated. . .
-    if ~strcmp(handles.DirLogs, handles.logPath)
-      [pathstr,name,ext,versn] = fileparts(logged(logNdx).fpathName);
-      b = outpostValByName('DirFiles', handles.outpostNmNValues);
-      %. . . if the reported path to the file starts the same as where Outpost was placing the file...
-      if (1 == findstrchr(b, pathstr))
-        % . . . let's rebuild the path based on the "live" path to the log
-        a = logged(logNdx).fpathName;
-        new_filePathName = sprintf('%s%s', outpostValByName('DirOutpost', handles.outpostNmNValues), a(length(b)+1:length(a)));
-        fidMsg = fopen(new_filePathName,'r');
-      end
-    end
-  end
-  if fidMsg > 0
-    fieldsFound = 0;
-    [PACF, linesRead] = detectPacFORM(fidMsg, 0, 100);
-    if PACF
-      [err, errMsg, pacfListNdx, thisForm, textLine] = getPACFType(fidMsg);
-      if (pacfListNdx == 3) % 'EOC MESSAGE FORM',
-        % skip through the comment/heading
-        textLine = '#' ;
-        while (1==findstrchr('#', textLine) & ~feof(fidMsg))
-          textLine = fgetl(fidMsg);
-        end
-        fieldsFound = 0;
-        while 1 % read & detect the field for each line of the entire message
-          if (1 == findstrchr(textLine, '#EOF')) | feof(fidMsg)
-            break
-          end
-          textLine = readPACFLine(textLine, fidMsg);
-          if feof(fidMsg)
-            err = 1 ;
-            errMsg = sprintf('>%s>neighSummFromLog: incomplete message: End-of-message but no "#EOF"', mfilename);
-            break
-          end
-          [fieldText, fieldID] = extractPACFormField(textLine) ;
-          fT = strtrim(fieldText);
-          switch fieldID
-          case '1a.' %date at top of form
-            neighborhoodDate = {fieldText};
-            foundDate = 1;
-            fieldsFound = fieldsFound + 1;
-          case '1b.' %time at top of form
-            a = findstrchr(':', fT);
-            if a
-              b = fT([1:(a-1) (a+1):length(fT)]);
-            else
-              b = fT;
-            end
-            if ~length(b)
-              b = '0';
-            end
-            foundColNdx(length(foundColNdx)+1) = find(handles.editTotals == handles.editLatestUpdate);
-            neighborhoodAmts(foundColNdx(length(foundColNdx)) ) = str2num(b);
-            fieldsFound = fieldsFound + 1;
-          case '9b.' % from location
-            %if the tactical call in the "from" field wasn't on the authorized list,
-            %  it might be in the message form itself in the "from location".  This is the situation for Summaries
-            %  which have been received in the EOC by voice.
-            if (~length(thisCERT) & length(fT))
-              %tactical calls can be no longer than 6 characters
-              thisCERT = find(ismember(handles.tacCall(handles.mtvCERTNdx(find(needToFindNeigh))), fT(1:min(length(fT),6))));
-            
-              a = find(needToFindNeigh);
-              thisCERT = a(thisCERT);
-            end % if (~length(thisCERT) & (length(fT) > 5))
-            if ~length(thisCERT)
-              %unknown/invalid: no need to keep reading
-              break
-            end
-            fieldsFound = fieldsFound + 1;
-          case '10.' %subject validate the subject but don't save
-            if ~findstrchr(fieldText, 'Neighborhood Summary')
-              break
-            end
-            fieldsFound = fieldsFound + 1;
-          case '12.' % Message part of the form
-            equalAt = findstrchr('=', fT);
-            ft = strrep(fT, char(10),'');
-            % replace any upside down question marks with LF
-            msgText = strrep(ft, char(191), char(10));
-            %extract all the information
-            upper_ft = upper(fieldText);
-            for colNdx = 1:length(searchKey)
-              %find where the key occurs in the message
-              a = findstrchr(char(searchKey(colNdx)), upper_ft);
-              if a %location of key in the current mesage
-                %find the equal just following the key
-                thisEqual = find(equalAt>a(1));
-                if length(thisEqual)>1
-                  nextEqual = equalAt(thisEqual(2))-1;
-                else
-                  nextEqual = length(fieldText);
-                end
-                thisEqual = equalAt(thisEqual(1));
-                % extract the text starting after the =
-                b = strtrim(fieldText(thisEqual+1:nextEqual));
-                %find the end of the numeric sequence
-                c = find(~ismember(b,'0123456789'));
-                if ~length(c)
-                  c = length(b)+1;
-                end
-                a = str2num(b(1:c(1)-1) );
-                if ~length(a)
-                  a = 0;
-                else
-                  foundColNdx(length(foundColNdx)+1) = colNdx;
-                end
-                neighborhoodAmts(colNdx) = a;
-                if (colNdx < 2)
-                  %the first & only the first supports a field split with a '-' such as 2-1
-                  c = findstrchr('-', b);
-                  if c
-                    b = strtrim(b(c(1)+1:length(b)));
-                    %find the end of the numeric sequence
-                    c = find(~ismember(b,'0123456789'));
-                    if ~length(c)
-                      c = length(b)+1;
-                    end
-                    a = str2num(b(1:c(1)-1) );
-                    if ~length(a)
-                      a = 0;
-                    else
-                      foundColNdx(length(foundColNdx)+1) = colNdx+1;
-                      neighborhoodAmts(colNdx+1) = a;
-                    end
-                  end
-                end
-              end % if a %location of key in the current mesage
-            end % for colNdx = 1:length(searchKey)
-            fieldsFound = fieldsFound + 1;
-          otherwise
-          end %switch fieldID
-          if fieldsFound > 4
-            % this test is redundant because if we didn't find "thisCERT" we'll have broken out of the "while"
-            %  in case '9b.'
-            %if length(thisCERT)
-            needToFindNeigh(thisCERT) = 0;
-            %only update fields we've found
-            if foundDate
-              handles.neighborhoodDate(thisCERT) = neighborhoodDate;
-            end
-            if length(foundColNdx)
-              handles.neighUpdate(thisCERT) = handles.neighUpdate(thisCERT) | any(handles.neighborhoodAmts(thisCERT, foundColNdx) ~= neighborhoodAmts(foundColNdx));
-              if handles.neighUpdate(thisCERT)
-                %tag the changed categories only  (handles.ne... array is preset to -1 so a report of 0 will be detected here
-                a = (handles.neighborhoodAmts(thisCERT, foundColNdx) ~= neighborhoodAmts(foundColNdx));
-                handles.neighUpdateAmt(thisCERT, foundColNdx(a)) = 1; 
-                %%debug
-                %%fprintf('\n new data for %s.', char(handles.tacCall(handles.mtvCERTNdx(thisCERT))) );
-              end %if handles.neighUpdate(thisCERT)
-              handles.neighborhoodAmts(thisCERT, foundColNdx) = neighborhoodAmts(foundColNdx);
-              handles.neighborhoodAmtsFlg(thisCERT, foundColNdx) = 1;
-              handles.messagePathName(thisCERT) = {new_filePathName};
-              [pathstr,name,ext,versn] = fileparts(new_filePathName);
-              set(handles.textNeighAmt(thisCERT, latestUpdateNdx), 'ToolTip',...
-                sprintf('Local Msg#:%s\nTheir Msg#:%s\nFile name: %s\nFile location: %s\nBBS Received Time: %s\n   Message text:%s', ...
-                logged(logNdx).logMsgNo, logged(logNdx).xfrMsgNo, name, pathstr, logged(logNdx).outpostDTime, msgText));
-            end
-            %end % if length(thisCERT)
-            break %out of while
-          end % if fieldsFound > 4
-          textLine = fgetl(fidMsg);
-        end % while 1 % read & detect the field for each line of the entire message
-      end % if (pacfListNdx == 3)
-    end % if PACF
-    fcloseIfOpen(fidMsg);
-  end % if fidMsg > 0
-  %if we've found a entry for all neighborhoods, quit searching the log.
-  if ~any(needToFindNeigh)
-    break
-  end
-end % for logNdx = length(logged):-1:1
-if any(handles.neighUpdate(:))
-  set(handles.pushbuttonUpdatedOK,'Visible','on');
-  %% debug
-  %%[err, errMsg, date_time, prettyDateTime] = datevec2timeStamp(now);
-  %%fprintf('\nnew data @ %s', date_time );
-end
-%% debug
-%%fid = fopen('F:\MTV_radioRoom_101107\SCCo Packet on cmv13706\logs\flag.txt','w');
-%%fprintf(fid,'debug');
-%%fcloseIfOpen(fid);
-% --------------------------------------------------------------------
 % --------------------------------------------------------------------
 function [ref, colXpos] = positColHdr(ref, brdr, bot, hi, h_data, h_hdg)
 % support for local function "positHeaders"
@@ -2787,7 +2353,7 @@ handles.textHeadings = [handles.textFireHdg, handles.textGasLeaksHdg, handles.te
 % hide the fires-out - not being used
 set([handles.editFireOut_Total handles.textFireOutHdg],'visible','off')
 % % the following are set to display the fireOut column.  To activate, also need to modify list in 
-% %   local function "neighSummFromLog"
+% %   file "neighSummFromLog"
 % % handles.editTotals = [handles.editFire_Total, handles.editFireOut_Total, handles.editGasTotal, handles.editWaterTotal, handles.editElecTotal, ...
 % %     handles.editChemTotal, handles.editBLiteTotal, handles.editBModerateTotal, handles.editBHeavyTotal, ...
 % %     handles.editPeopImmTotal, handles.editPeopDlydTotal, handles.editPeopTrapTotal, handles.editPeopMorgTotal, ...
@@ -2866,6 +2432,8 @@ handles.neighborhoodAmtsFlg(dim1, 1:size(handles.colXpos,1)) = 0;
 Ndx = find(handles.editTotals == handles.editLatestUpdate);
 handles.neighborhoodAmts(:, Ndx) = -1;
 handles.neighborhoodDate(dim1) = {''};
+% comment portions of Damage Summaries: everything after the Damage Categories
+handles.neighborhoodCmt(dim1) = {''};
 %flag array set when a neighborhood provides new data and cleared when the update OK button is pushed
 %   0:no update; 1:updated in the latest read; 2:updated in a previous read
 handles.neighUpdate(dim1) = 0;
@@ -2892,73 +2460,41 @@ fid = fopen(sprintf('%s%s.ini', handles.workingDir, mfilename), 'r');
 if (fid > 0)
   [imageLowerLeft, foundFlg_1] = findNextract('image lower left', 0, 0, fid);
   [imageLLsize] = findNextractNum('display lower left size ratio', 0, 0, fid);
-  [imageLowerRigth, foundFlg_2] = findNextract('image lower right', 0, 0, fid);
+  [imageLowerRight, foundFlg_2] = findNextract('image lower right', 0, 0, fid);
   [imageRRsize] = findNextractNum('display lower right size ratio', 0, 0, fid);
   fcloseIfOpen(fid);
   if foundFlg_1
     [handles, refSize] = loadPlaceImage(strcat(handles.workingDir, imageLowerLeft), 'imageLowerLeft', 0, handles.figure1, handles, imageLLsize);
   end
   if foundFlg_2
-    [handles] = loadPlaceImage(strcat(handles.workingDir, imageLowerRigth), 'imageLowerRigth', 1, handles.figure1, handles, imageRRsize, refSize);
+    [handles] = loadPlaceImage(strcat(handles.workingDir, imageLowerRight), 'imageLowerRight', 1, handles.figure1, handles, imageRRsize, refSize);
   end
 end % if (fid > 0)
 
 %make the font size the same as the headings
-fontSize = get(handles.editGasTotal,'FontSize');
-opts = struct('Style', 'text', 'parent', handles.figure1,'units','pixels', ...
-  'fontName', 'Courier', 'fontUnits', 'points', 'fontSize', fontSize);
 
 %starting height is the same as the TOTALs: each neighborhood line starts with this height
 % but can be made taller if the text needs to wrap to fit into the width of the box.
 hi = handles.positNeigh(4);
-[pathstr,namestr,ext,versn] = fileparts(handles.tacCallFName);
-namestr = strcat(namestr, ext);
 for neighNdx = 1:length(handles.mtvCERTNdx)
-  handles.textNeigh(neighNdx) = uicontrol(opts, 'position', handles.positNeigh, 'fontWeight', 'normal', 'BackgroundColor', handles.neighBkClr(mod(neighNdx,2)+1, :));
-  a = char(handles.tacAlias(handles.mtvCERTNdx(neighNdx)));
-  %pull the text " CERT" from the label - we know this is CERT!
-  b = findstrchr(' CERT', a);
-  a = {a(1:b-1)};
-  [outstring,newpos] = textwrap(handles.textNeigh(neighNdx), a);
-  %if the text had to wrap to another line...
-  if length(outstring) > length(a)
-    %make the box (& therefore the line) taller
-    % (a) move down
-    handles.positNeigh(2) = handles.positNeigh(2) - newpos(4) + handles.positNeigh(4);
-    % (b) make taller
-    handles.positNeigh(4) = newpos(4);
-    set(handles.textNeigh(neighNdx),'Position', handles.positNeigh);
-  end % if length(outstring) > length(a)  handles.tacCall
-  a = sprintf('%s <-> %s', char(handles.tacCall(handles.mtvCERTNdx(neighNdx))),char(handles.tacAlias(handles.mtvCERTNdx(neighNdx))));
-  a = sprintf('%s\n\nFile: "%s"\nPath: "%s"', a, namestr, pathstr);
-  set(handles.textNeigh(neighNdx),'string', outstring, ...
-    'ToolTip', a)
-  %build the boxes for the reported amounts
-  for col = 1:size(handles.colXpos,1)
-    handles.textNeighAmt(neighNdx, col) = uicontrol(opts, 'position', [handles.colXpos(col, 1) handles.positNeigh(2) handles.colXpos(col, 2) handles.positNeigh(4)], 'BackgroundColor', handles.neighBkClr(mod(neighNdx,2)+1, :));
-    %indicate no results yet known
-    set(handles.textNeighAmt(neighNdx, col),'string', {'-'})
-  end % for col = 1:size(handles.colXpos,1)
-  %re-establish the basic height
-  handles.positNeigh(4) = hi;
-  %move the bottom down the page
-  handles.positNeigh(2) = handles.positNeigh(2) - handles.positNeigh(4) - handles.brdr;
+  handles = addLineToDisp(handles, neighNdx, hi);  
 end % for neighNdx = 1:length(handles.mtvCERTNdx) 
-if length(handles.mtvCERTNdx)
-  %frames for the edges of the columns of groups:
-  opts = struct('Style', 'frame', 'parent', handles.figure1,'units','pixels', ...
-    'fontName', 'Courier', 'fontUnits', 'points', 'fontSize', fontSize, 'BackgroundColor', [0 0 0], 'fontWeight', 'normal');
-  %get top & bottom
-  a = get(handles.textNeighAmt(1,1), 'position');
-  b = get(handles.textNeighAmt(length(handles.mtvCERTNdx),1), 'position');
-  framPos = [0 b(2) handles.brdr (a(2)+a(4)-b(2))];
-  handles = frameGroups(framPos, handles, opts, handles.textBldGrpHeading,'Bldg');
-  handles = frameGroups(framPos, handles, opts, handles.textPeopleGrpHdg, 'People');
-  handles = frameGroups(framPos, handles, opts, handles.textRoadGrpHdg, 'Road');
-end % if length(handles.mtvCERTNdx)
-guidata(handles.figure1, handles);
+handles = frameGroupBorders(handles);
 % --------------------------------------------------------------------
 function handles = frameGroups(framPos, handles, opts, h_grp, frameName)
+%delete previous elements of the same name... if any
+fn = fieldnames(handles);
+a = 0;
+for itemp = 1:length(fn);
+  if findstrchr(sprintf('frame%sLeft', frameName), char(fn(itemp))) | ...
+      findstrchr(sprintf('frame%sRight', frameName), char(fn(itemp)))
+    delete(getfield(handles, char(fn(itemp))) );
+    a = a + 1;
+    if (a > 1)
+      break
+    end % if (a > 1)
+  end % if findstrchr(sprintf('frame%sLeft', frameName), char(fn(itemp))) | ...
+end % for itemp = 1:length(fn);
 a = get(h_grp, 'position');
 handles = setfield(handles, sprintf('frame%sLeft', frameName), uicontrol(opts, 'position', [(a(1)-handles.brdr) framPos(2:4)]));
 handles = setfield(handles, sprintf('frame%sRight', frameName), uicontrol(opts, 'position', [(a(1)+a(3)+handles.brdr-1) framPos(2:4)]));
@@ -3104,6 +2640,12 @@ refSize = [sz(2) sz(1)];
 h_newAxes = axes('parent',h_parent,'units','pixels','position', [x y refSize*imgSizeRatio]);
 newAxes = sprintf('axes%s', nameForHandle);
 handles = setfield(handles, newAxes, h_newAxes);
+pF = get(handles.frameFooter, 'position');
+pH = get(h_newAxes, 'position');
+if pF(4) < (pH(4) + pH(2))
+  pF(4) = (pH(4) + pH(2)) ;
+  set(handles.frameFooter, 'position', pF);
+end
 
 % MATLAB doesn't tell you statement requires ", h_newAxes" or
 %   a new figure is opened!
@@ -3118,7 +2660,186 @@ set(handles.figure1,'colormap', grayMap)
 %Turn off the axis. Again, MATLAB doesn't show this is the method that works!
 set(h_newAxes,'visible','off')
 
-
-
 % --------------------------------------------------------------------
+function handles = addLineToDisp(handles, Ndx, hi);
+opts = struct('Style', 'text', 'parent', handles.figure1,'units','pixels', ...
+  'fontName', 'Courier', 'fontUnits', 'points', 'fontSize', get(handles.editGasTotal,'FontSize'));
+[pathstr,namestr,ext,versn] = fileparts(handles.tacCallFName);
+namestr = strcat(namestr, ext);
+
+handles.textNeigh(Ndx) = uicontrol(opts, 'position', handles.positNeigh, 'fontWeight', 'normal', 'BackgroundColor', handles.neighBkClr(mod(Ndx,2)+1, :));
+% % a = char(handles.tacAlias(handles.mtvCERTNdx(Ndx)));
+a = char(handles.rowNames(handles.mtvCERTNdx(Ndx)));
+%pull the text " CERT" from the label
+b = findstrchr(' CERT', a);
+if b
+  a = {a(1:b-1)};
+else
+  a = {a};
+end
+[outstring,newpos] = textwrap(handles.textNeigh(Ndx), a);
+%if the text had to wrap to another line...
+if length(outstring) > length(a)
+  %make the box (& therefore the line) taller
+  % (a) move down
+  handles.positNeigh(2) = handles.positNeigh(2) - newpos(4) + handles.positNeigh(4);
+  % (b) make taller
+  handles.positNeigh(4) = newpos(4);
+  set(handles.textNeigh(Ndx),'Position', handles.positNeigh);
+end % if length(outstring) > length(a)  handles.tacCall
+a = sprintf('%s <-> %s', char(handles.tacCall(handles.mtvCERTNdx(Ndx))),char(handles.tacAlias(handles.mtvCERTNdx(Ndx))));
+if ~strcmp(char(handles.rowNames(handles.mtvCERTNdx(Ndx))), char(handles.tacAlias(handles.mtvCERTNdx(Ndx))) )
+  a = sprintf('%s <-> %s', a, char(handles.rowNames(handles.mtvCERTNdx(Ndx))));
+end
+a = sprintf('%s\n\nFile: "%s"\nPath: "%s"', a, namestr, pathstr);
+set(handles.textNeigh(Ndx),'string', outstring, ...
+  'ToolTip', a)
+% test if bottom of new row projects into footer area.
+pF = get(handles.frameFooter, 'position');
+% if bottom of new row is below top of footer. . .
+pTemp = handles.positNeigh(2) ;
+%re-establish the basic height
+if ( (pF(2) + pF(4)) > pTemp )
+  %position is into the footer
+  %  resize the window by the amount the row goes into the footer... 
+  scrnAdj = (pF(2) + pF(4)) - pTemp + handles.brdr;
+  pos = get(handles.figure1,'Position');
+  pos(2) = pos(2) - scrnAdj; %move down
+  pos(4) = pos(4) + scrnAdj; %make taller (i.e. don't move top)
+  posOf = rowPos(handles) ;
+  % if new position is below the screen bottom...
+  pSc = get(0,'ScreenSize') ;
+  if (pos(2) < pSc(2))
+    % if window height is not larger than screen
+    if (pSc(4) <= pSc(4) )
+      % move window bottom up
+      pos(2) = pSc(2) ;
+    end % if (pSc(4) <= pSc(4) )
+  end % if (pos(2) < pSc(2))
+  set(handles.figure1,'Position', pos);
+  [posOf, handles] = rowPos(handles, posOf, scrnAdj) ;
+end % if ( (pF(2) + pF(4)) > pTemp )
+%build the boxes for the reported amounts
+for col = 1:size(handles.colXpos,1)
+  handles.textNeighAmt(Ndx, col) = uicontrol(opts, 'position', [handles.colXpos(col, 1) handles.positNeigh(2) handles.colXpos(col, 2) handles.positNeigh(4)], 'BackgroundColor', handles.neighBkClr(mod(Ndx,2)+1, :));
+  %indicate no results yet known
+  set(handles.textNeighAmt(Ndx, col),'string', {'-'})
+end % for col = 1:size(handles.colXpos,1)
+
+handles.positNeigh(4) = hi;
+%move the bottom down the page
+handles.positNeigh(2) = handles.positNeigh(2) - handles.positNeigh(4) - handles.brdr;
+
+% ------------------ function handles = addLineToDisp ----------------
+% --------------------------------------------------------------------
+function handles = frameGroupBorders(handles);
+% Adds frame/border between the columns of Groups for all list rows.
+%  Subtle effect.  Should be called after "addLineToDisp"
+if length(handles.mtvCERTNdx)
+  %frames for the edges of the columns of groups:
+  opts = struct('Style', 'frame', 'parent', handles.figure1,'units','pixels', ...
+    'fontName', 'Courier', 'fontUnits', 'points', 'fontSize', get(handles.editGasTotal,'FontSize'),...
+    'BackgroundColor', [0 0 0], 'fontWeight', 'normal');
+  %get top & bottom
+  a = get(handles.textNeighAmt(1,1), 'position');
+  b = get(handles.textNeighAmt(length(handles.mtvCERTNdx),1), 'position');
+  framPos = [0 b(2) handles.brdr (a(2)+a(4)-b(2))];
+  handles = frameGroups(framPos, handles, opts, handles.textBldGrpHeading,'Bldg');
+  handles = frameGroups(framPos, handles, opts, handles.textPeopleGrpHdg, 'People');
+  handles = frameGroups(framPos, handles, opts, handles.textRoadGrpHdg, 'Road');
+end % if length(handles.mtvCERTNdx)
+guidata(handles.figure1, handles);
+% --------------------------------------------------------------------
+function varargout = ResizeFcn(h, eventdata, handles, varargin)
+% % fprintf('\nResize...');
+% disable the callback . . . while we're processing. . .
+set(handles.figure1, 'ResizeFcn', '')
+currentPos = get(handles.figure1, 'Position');
+if ( (handles.figLastPos(3) ~= currentPos(3)) | (handles.figLastPos(4) ~= currentPos(4)) )
+  dHi = currentPos(4) - handles.figLastPos(4);
+  dWi = currentPos(3) - handles.figLastPos(3) ;
+  fn = fieldnames(handles);
+  for itemp = 1:length(fn);
+    if findstrchr('frame',char(fn(itemp))) & (findstrchr('Left',char(fn(itemp))) | findstrchr('Right',char(fn(itemp))))
+      adjPos(getfield(handles, char(fn(itemp))), dWi, dHi)
+    end % if findstrchr('frame',char(fn(itemp))) & findstrchr('Left',char(fn(itemp)))
+  end % for itemp = 1:length(fn);
+  for Row = 1:size(handles.textNeighAmt,1)
+    adjPos(handles.textNeigh(Row), dWi, dHi)
+    for col = 1:size(handles.textNeighAmt,2)
+      adjPos(handles.textNeighAmt(Row, col), dWi, dHi)
+    end % for col = 1:size(handles.textNeighAmt,2)
+  end % for Row = 1:size(handles.textNeighAmt,1)
+  for Ndx = 1:length(handles.editTotals)
+    adjPos(handles.editTotals(Ndx), dWi, dHi)
+  end
+  for Ndx = 1:length(handles.textHeadings)
+    adjPos(handles.textHeadings(Ndx), dWi, dHi)
+  end
+  adjPos(handles.textBldGrpHeading, dWi, dHi)
+  adjPos(handles.textPeopleGrpHdg, dWi, dHi)
+  adjPos(handles.textRoadGrpHdg, dWi, dHi)
+  adjPos(handles.frame4, dWi, dHi)
+  adjPos(handles.textTOTAL, dWi, dHi)
+  adjPos(handles.frame5, dWi, dHi)
+  % let vertical position move as it wants & control horizontal
+  adjPos(handles.axesimageLowerRight, dWi, 0)
+  % let horizontal position move as it wants & control vertical
+  adjPos(handles.textTitle, 0, dHi)
+  handles.positNeigh(2) = handles.positNeigh(2) + dHi ;
+  handles.positNeigh(1) = handles.positNeigh(1) + dWi ;
+  %update the known position
+  handles.figLastPos([3 4]) = currentPos([3 4]) ;
+  guidata(handles.figure1, handles);
+end % if handles.figLastPos(3) ~= currentPos(3) | handles.figLastPos(4) ~= currentPos(4)
+%. . . done processing the callback so re-enable.
+set(handles.figure1, 'ResizeFcn', 'dispNghbrhdSmry(''ResizeFcn'',gcbo,[],guidata(gcbo))')
+% ---------- function varargout = ResizeFcn() ------------------------
+% --------------------------------------------------------------------
+function adjPos(h_obj, dWi, dHi)
+% used by function ResizeFcn
+pos = get(h_obj,'position');
+pos(1) = pos(1) + dWi ;
+%retain position relative to top: move up
+pos(2) = pos(2) + dHi ;
+set(h_obj,'position', pos);
+% --------------------------------------------------------------------
+function [posOf, handles] = rowPos(handles, last_posOf, scrnAdj)
+% Called by "addLineToDisp" twice when the added line requires the window
+%   size to be increased.  One call before the window is re-sized &
+%   one after.  This module will detect which rows/lines moved within
+%   the window & which stayed relative to the bottom.  The lines
+%   which remained locked to the bottom will be moved up so the new
+%   room appears at the bottom of the list/rows.
+posOf(1:length(handles.textNeigh)) = 0 ;
+for Row = 1:length(handles.textNeigh)
+  pos = get(handles.textNeigh(Row),'position');
+  posOf(Row) = pos(2); %save Y position
+end
+if nargin < 2
+  %%%%%%%%%
+  %%%%%%%%%
+  return
+  %%%%%%%%%
+  %%%%%%%%%
+end
+rowsToMove = find(posOf == last_posOf);
+if any(rowsToMove == length(handles.textNeigh))
+  handles.positNeigh(2) = handles.positNeigh(2) + scrnAdj ;
+end % if any(rowsToMove == length(handles.textNeigh))
+for itemp = 1:length(rowsToMove)
+  Row = rowsToMove(itemp);
+  pos = get(handles.textNeigh(Row),'position');
+  pos(2) = pos(2) + scrnAdj ;
+  set(handles.textNeigh(Row),'position', pos)
+  if ( Row < size(handles.textNeighAmt, 1) )
+    for col = 1:size(handles.textNeighAmt, 2)
+      pos = get(handles.textNeighAmt(Row, col),'position');
+      pos(2) = pos(2) + scrnAdj ;
+      set(handles.textNeighAmt(Row, col),'position', pos)
+    end % for col = 1:size(handles.textNeighAmt, 2)
+  end % if ( Row < size(handles.textNeighAmt, 1) )
+end % for itemp = 1:length(rowsToMove)
+% --------------------------------------------------------------
+% ------------------- function rowPos --------------------------
 

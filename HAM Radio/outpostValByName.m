@@ -1,4 +1,4 @@
-function var = outpostValByName(varName, outpostNmNValues);
+function [var, errMsg] = outpostValByName(varName, outpostNmNValues);
 % function var = outpostValByName(varName, outpostVarNameList);
 %
 %Looks through the named list of variable from Outpost.INI
@@ -8,6 +8,8 @@ function var = outpostValByName(varName, outpostNmNValues);
 Ndx = find(ismember(outpostNmNValues, varName));
 if Ndx
   var = char(outpostNmNValues(Ndx+1));
+  errMsg = '';
 else
-  var = sprintf('unknown-"%s" not found in Outpost.INI', varName) ;
+  var = '';
+  errMsg = sprintf('unknown-"%s" not found in Outpost.INI', varName) ;
 end

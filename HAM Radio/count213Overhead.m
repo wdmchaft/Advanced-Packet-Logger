@@ -1,6 +1,8 @@
 function count213Overhead
 
-pathTo = 'C:\Outpost Oct 2010 drills\XSC\archive\InTray';
+pathTo = 'C:\PacketDrills\Outpost Oct 2010 drills\XSC\archive\InTray';
+pathTo = 'C:\PacketDrills\XSC_1101_drill\SCCo Packet\archive\InTray';
+pathTo = 'C:\PacketDrills\XSC_110522\SCCo Packet\archive\InTray';
 
 pathTo = endWithBackSlash(pathTo);
 

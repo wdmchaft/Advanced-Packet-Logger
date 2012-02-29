@@ -32,10 +32,13 @@ function textLine = readPACFLine(textLine, fid);
 while (~length(textLine) & ~feof(fid))
   textLine = fgetl(fid);
 end
+% if (1 == findstrchr(textLine, '#EOF'))
+%   return
+% end
 
 %go past non-Field lines
 while 1 & ~feof(fid)
-  if findstrchr(': [', textLine)
+  if findstrchr(': [', textLine) | findstrchr(':[', textLine)
     break
   end
   % %   leftBraceAt = findstrchr('[', textLine);

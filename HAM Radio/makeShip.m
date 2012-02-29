@@ -19,19 +19,59 @@ uniqueFromShipDir = {'readme.doc', '"Sample of real time packet log display.doc"
 % target directory 
 shipDir = 'C:\mFiles\HAM Radio\ShipPackage\';
 
+shipDir = endWithBackSlash(shipDir) ;
+a = findstrchr('\', shipDir);
+sourceFileDir = shipDir(1:a(length(a)-1) );
+
+%first call to progress figure
+namesOfSteps = {...
+    'Establish Outpost location', ...
+    'Find executable & .inc files', ...
+    'Update/copy FilesFromPrgm', ...
+    'Update/copy FilesFromAddOns', ...
+    'Update/copy ScriptsNeeded', ...
+    'Update/copy .exe & rename to .exx', ...
+    'Create Installer files', ...
+  };%  program status identifier 
+
+cancel;
+compiledName = mfilename;
+progJustOpened = -1;
+originalPWD = pwd;
+outputFileName = 'autoLog*';
+
+debugCode = 0;
+%just some junk as a reminder of how to use:
+debugRuleList = {'including focus scan','exciting features'};
+originalPWD = endWithBackSlash(pwd);
+%first call of 2
+%list steps, debug/release not known: don't display
+[h_progress, err, maxStepLabels] = progress(namesOfSteps, progJustOpened, strcat(outputFileName, '.zip'), originalPWD, {});
+progress('updateStatus', 1, 'running');
+progress('editTrgDir_Callback', shipDir)
+
+% Establishing Outpost location
+
 % location of Outpost
 [err, errMsg, outpostNmNValues] = OutpostINItoScript; 
 DirOutpost = outpostValByName('DirOutpost', outpostNmNValues);
-prompt  = {'Confirm location of Outpost where the source files are linked:'};
-title   = 'Outpost Location';
-lines= 1;
-def     = {DirOutpost};
-answer  = inputdlg(prompt,title,lines,def);
-if ~length(answer)
+
+origDir = pwd;
+cd(DirOutpost)
+[fname, pname] = uigetfile('outpost.ini','Confirm/change location of the Outpost.ini to be used.');
+cd(origDir)
+if isequal(fname,0) | isequal(pname,0)
+  %%%%%%%%%%%%%%%%%%%%
+  %%%%%%%%%%%%%%%%%%%%
   return
+  %%%%%%%%%%%%%%%%%%%%
+  %%%%%%%%%%%%%%%%%%%%
 end
-DirOutpost = endWithBackSlash(char(answer));
-shipDir = endWithBackSlash(shipDir);
+
+DirOutpost = endWithBackSlash(char(pname));
+[err, errMsg, outpostNmNValues] = OutpostINItoScript(DirOutpost); 
+DirAddOns = outpostValByName('DirAddOns', outpostNmNValues);
+DirPrgms = outpostValByName('DirAddOnsPrgms', outpostNmNValues);
 
 % files desired from the ...\Outpost\AddOns\Programs directory
 filesFromPrgm = {'*.fig','*.jpg','grayMap.mat','*.dll'};  %also *.exe but renamed and don't want in zip so handled separately
@@ -40,7 +80,7 @@ filesFromAddOns = {'ICS213.mat', 'ICS213_crossRef.csv', 'print_ICS_213.ini', ...
     'inTray_copies.txt', 'outTray_copies.txt','Tac call alias.txt'};
 
 % background images for printed forms . . .
-formCoreNames = dir(sprintf('%sAddOns\\Programs\\*.jpg', DirOutpost));
+formCoreNames = dir(sprintf('%s*.jpg', DirPrgms));
 % . . . the associated layout and alignment files
 for itemp = 1:length(formCoreNames)
   [pathstr,name,ext,versn] = fileparts(formCoreNames(itemp).name);
@@ -65,23 +105,55 @@ scriptsNeeded = {'sendRec*.osl', 'startUp.osl'};
 %   fprintf(fid, 'copy %s "%%1 %%2 %%3 %%4 %%5 %%6\\%s\r\n', thisName, thisName);
 % 
 
+progress('updateStatusNext', 'running');
+% Find executable & .inc files
 
 %update/copy all .exe files to the shipDir
-exeFiles = dir(sprintf('%sAddOns\\Programs\\*.exe', DirOutpost));
+%  AND look for the related .inc files, if any, in the source code directory
+fileSpec = {};
+exeFiles = dir(sprintf('%s*.exe', DirPrgms));
 fid = fopen(strcat(shipDir, 'exeToPrgm.txt'),'w');
 for itemp = 1:length(exeFiles)
   fprintf(fid, '%s\r\n', char(exeFiles(itemp).name));
+  %
+  [pathstr,name,ext,versn] = fileparts(char(exeFiles(itemp).name));
+  a = dir(sprintf('%s%s.inc', sourceFileDir, name));
+  if length(a)
+    [err, errMsg, fileList] = incFileToList(strcat(sourceFileDir, a(1).name));
+    fileSpec = [fileSpec fileList];
+  end
 end %for itemp = 1:length(filesFromAddOns)
 fclose(fid) ;
-bac_It( sprintf('%sAddOns\\Programs\\', DirOutpost), shipDir, '*.exe');
+progress('listboxMsg_Callback', sprintf('Update/copy *.exe from %s to %s.', DirPrgms, shipDir))
+[err, errMsg, numFiles, copied, errors, copyupdateList, errorList] = bac_It( sprintf('%s', DirPrgms), shipDir, '*.exe');
+progress('listboxMsg_Callback', sprintf('  Checked %i files, copied/updated %i ', numFiles, copied))
 %OutpostToINIScript is in a special location in an effort to get scripts to find it!
-bac_It( DirOutpost, shipDir, 'outpostINItoScript.exe');
+progress('listboxMsg_Callback', sprintf('Update/copy outpostINItoScript.exe from %s to %s.', DirOutpost, shipDir))
+[err, errMsg, numFiles, copied, errors, copyupdateList, errorList] = bac_It( DirOutpost, shipDir, 'outpostINItoScript.exe');
+progress('listboxMsg_Callback', sprintf('  Checked %i files, copied/updated %i ', numFiles, copied))
+%add any files mentioned in the sourceFileDir<fileName>.inc of the <fileName>.exe files
+%  which could be in either the Prgms or AddOns directory:
+% determine which directory they are in & add to that directory's list
+for itemp = 1:length(fileSpec)
+  a = dir(strcat(DirPrgms, fileSpec{itemp}));
+  if length(a)
+    filesFromPrgm = [filesFromPrgm fileSpec(itemp) ];
+  end
+  a = dir(strcat(DirAddOns, fileSpec{itemp}));
+  if length(a)
+    filesFromAddOns = [filesFromAddOns fileSpec(itemp) ];
+  end
+end % for itemp = 1:length()
 
+progress('updateStatusNext', 'running');
+%Update/copy FilesFromPrgm
 %update/copy all the files specified in "filesFromPrgm" to the ship dir
 fileNames2Incl = {};
 for itemp = 1:length(filesFromPrgm)
   a = char(filesFromPrgm(itemp));
-  bac_It( sprintf('%sAddOns\\Programs\\', DirOutpost), shipDir, a);
+  progress('listboxMsg_Callback', sprintf('Update/copy %s from %s to %s.', a, DirPrgms, shipDir))
+  [err, errMsg, numFiles, copied, errors, copyupdateList, errorList] = bac_It( sprintf('%s', DirPrgms), shipDir, a);
+  progress('listboxMsg_Callback', sprintf('  Checked %i files, copied/updated %i ', numFiles, copied))
   incl = 1;
   %if the current file has an extension that is in the list
   %  of files that will be zipped regardless of name, don't add the
@@ -97,10 +169,14 @@ for itemp = 1:length(filesFromPrgm)
   end
 end %for itemp = 1:length(filesFromPrgm)
 
+progress('updateStatusNext', 'running');
+%Update/copy FilesFromAddOns
 %update/copy all the files specified in "filesFromAddOns" to the ship dir
 for itemp = 1:length(filesFromAddOns)
   a = char(filesFromAddOns(itemp));
-  bac_It( sprintf('%sAddOns\\', DirOutpost), shipDir, char(filesFromAddOns(itemp)));
+  progress('listboxMsg_Callback', sprintf('Update/copy %s from %s to %s.', a, DirAddOns, shipDir))
+  [err, errMsg, numFiles, copied, errors, copyupdateList, errorList] = bac_It( sprintf('%s', DirAddOns), shipDir, char(filesFromAddOns(itemp)));
+  progress('listboxMsg_Callback', sprintf('  Checked %i files, copied/updated %i ', numFiles, copied))
   incl = 1;
   %if the current file has an extension that is in the list
   %  of files that will be zipped regardless of name, don't add the
@@ -116,12 +192,17 @@ for itemp = 1:length(filesFromAddOns)
   end
 end %for itemp = 1:length(filesFromAddOns)
 
+progress('updateStatusNext', 'running');
+%Update/copy ScriptsNeeded
 %update/copy the relevant scripts
 for itemp = 1:length(scriptsNeeded)
   a = char(scriptsNeeded(itemp));
-  bac_It( sprintf('%sScripts\\', DirOutpost), shipDir, char(scriptsNeeded(itemp)));
+  progress('listboxMsg_Callback', sprintf('Update/copy %s from %s to %s.', a, outpostValByName('DirScripts', outpostNmNValues), shipDir))
+  [err, errMsg, numFiles, copied, errors, copyupdateList, errorList] = bac_It( outpostValByName('DirScripts', outpostNmNValues), shipDir, char(scriptsNeeded(itemp)));  
+  progress('listboxMsg_Callback', sprintf('  Checked %i files, copied/updated %i ', numFiles, copied))
 end
 
+%Create Installlation direction files
 % create some files that will be used during the installation process:
 fid = fopen(strcat(shipDir, 'filesToAddOns.txt'),'w');
 for itemp = 1:length(filesFromAddOns)
@@ -140,6 +221,8 @@ end
 
 fileNames2Incl = [archiveAll scriptsNeeded fileNames2Incl uniqueFromShipDir, {'filesToAddOns.txt', 'filesToPrgm.txt'}];
 
+progress('updateStatusNext', 'running');
+%Copy .exe & rename to .exx
 %create a batch file that will 
 %  1) delete any old/existing *.exx files
 %  2) copy the .exe files to .exx files . . .
@@ -189,7 +272,8 @@ BATcommand = sprintf('"%s" a autologUpgrade%s.zip', b, dateIs);
 
 
 %make sure all files that we bothered to check out are included in the archival ZIP
-%  note that if this loop executes and "fileNames2CheckOut" has any null string entries, the command to ZIP will be seen as asking ZIP to include ALL files!
+%  note that if this loop executes and "fileNames2CheckOut" has any null string entries, 
+%    the command to ZIP will be seen as asking ZIP to include ALL files!
 for itemp = 1:length(fileNames2Incl)
   BATcommand = sprintf('%s %s', BATcommand, char(fileNames2Incl(itemp)) );
 end
@@ -200,13 +284,24 @@ fprintf(fid, 'pause\r\n');
 fprintf(fid, 'exit\r\n');
 fcloseIfOpen(fid);
 
-
+progress('updateStatusNext', 'running');
+%Create Installer files
 origDir = pwd;
 cd(shipDir)
+progress('editCurDir_Callback', shipDir);
 %call the full install .bat 
 [err, errMsg] = dosIt(sprintf('makeShip.bat &'), '', 0, 'makeShip.m', 1);
 cd(origDir)
+progress('editCurDir_Callback', originalPWD);
 if err
   fprintf('\nError: %i %s', err, errMsg);
+  progress('updateStatusCurrent', 'Fail');
   return
 end
+progress('updateStatusCurrent', 'Pass');
+
+% if err
+%   progress('listboxMsg_Callback', errMsg);
+%   progress('updateStatusCurrent', 'Fail');
+%   return
+% end

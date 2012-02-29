@@ -3,14 +3,21 @@ function varargout = packetLogSettings(varargin)
 %INPUT:
 % either or none in any order:
 %   <opening tab>[optinal]: desired tab initially active from the following
-%      summary; logprint; 
-%   <path to Outpost>[optinal]: if not present, search defined in findOutpostINI.m
+%     (case insensitive)
+%      summary; 
+%      logprint; or 
+%      messagePrint [prefix for print control files (such as caller's mfilename];  
+%         if prefix isn't present, uses "inTray_copies.txt", "inTray_DelvrRecp.txt",
+%         "outTray_copies.txt", "outTrayPaper_copies.txt", "print_ICS_213.ini", &
+%         "ProcessOPM.ini".  If present, appends prefix to the front of each ->
+%         if any don't exist, they will be created.
+%   <path to Outpost>[optional]: if not present, search defined in findOutpostINI.m
 %
 % packetLogSettings Application M-file for packetLogSettings.fig
 %    FIG = packetLogSettings launch packetLogSettings GUI.
 %    packetLogSettings('callback_name', ...) invoke the named callback.
 
-% Last Modified by GUIDE v2.0 22-Oct-2010 11:06:52
+% Last Modified by GUIDE v2.0 10-Dec-2011 09:52:35
 % Modified structure for similarity to Matlab 2008
 
 %***************
@@ -176,44 +183,68 @@ figure1 = openfig(mfilename,'new');
 % Use system color scheme for figure:
 set(figure1,'Color',get(0,'defaultUicontrolBackgroundColor'));
 
+% Generate a structure of handles to pass to callbacks, and store it. 
+handles = guihandles(figure1);
 
 % % %if the caller of this entire module is trying to set the properties....
 % % if nargin
 % %   set(figure1, varargin{:})
 % % end
 openTab = 'summary';
-inOutpostPath = '';
+handles.inOutpostPath = '';
+prtPrefix = '' ;
 if nargin
-  for itemp = 1:size(varargin,2)
+  itemp = 1;
+  while itemp <= size(varargin,2)
     a = char(varargin(itemp));
     b = findstrchr(':', a) + findstrchr('\\', a);
     if b
-      inOutpostPath = a;
+      handles.inOutpostPath = endWithBackSlash(a, 1);
     else
       openTab = a;
+      if (size(varargin,2) > itemp)
+        itemp = itemp + 1;
+        prtPrefix = char(varargin(itemp));
+      end % if (size(varargin,2) > itemp)
     end
-  end
+    itemp = itemp + 1;
+  end %  while itemp <= size(varargin,2)
 end
-
-
-% Generate a structure of handles to pass to callbacks, and store it. 
-handles = guihandles(figure1);
 fn = fieldnames(handles);
 
 handles.codeVersion = 1.01;
-[err, errMsg, handles.outpostNmNValues] = OutpostINItoScript(inOutpostPath); 
+% get Outpost's settings
+handles.outINIref = 'Outpost_comparison.ini';
+[err, errMsg, handles] = readOutINI(handles.inOutpostPath, handles, mfilename);
+if (err < 0)
+  fprintf('ERROR: %s', errMsg);
+  varargout{1} = err;
+  varargout{2} = strcat(modName, errMsg);
+  varargout{3} = figure1;
+  %%%%%%%%%%%
+  %%%%%%%%%%%
+  return
+  %%%%%%%%%%%
+  %%%%%%%%%%%
+end
+if ~length(handles.inOutpostPath)
+  handles.inOutpostPath = outpostValByName('DirOutpost', handles.outpostNmNValues);
+end
 %if the user didn't give the fig a name in "guide", we'll default to the 
 % name of this mfile.
 a = get(figure1, 'name');
 ni = findstr(a,'Untitled');
 if ~isempty(ni)
-  set(figure1,'name',sprintf('%s for Outpost in %s', mfilename, outpostValByName('DirOutpost', handles.outpostNmNValues)) );
+  set(figure1,'name',sprintf('%s for Outpost in %s', mfilename, handles.inOutpostPath) );
 end
+% this is the color used to highlight conflicts
+ud.backColor = get(handles.editSummTacIDErr,'BackgroundColor');
+set(handles.editSummTacIDErr,'UserData', ud);
 guidata(figure1, handles);
 
 [codeName, codeVersion, codeDetail] = getCodeVersion(handles);
 fprintf('\r\nCode: %s, version %s %s', codeName, codeVersion, codeDetail);
-fprintf('\r\nAccessing Outpost in %s', outpostValByName('DirOutpost', handles.outpostNmNValues));
+fprintf('\r\nAccessing Outpost in %s', handles.inOutpostPath);
 
 fprintf('\r\n');
 fprintf('\r\n*** you may minimize this window. Do NOT close ****');
@@ -244,6 +275,7 @@ handles.prtSentPpr = 0; %outTrayPaper_copies.txt: list of copies for outgoing me
 handles.prtSente = 0; %outTray_copies.txt: list of copies for outgoing messages that did not originate on paper.
 handles.prtRecv = 0; %inTray_copies.txt: list of copies for incoming messages other than delivery receipts
 handles.prtDelvrRecp = 0; %inTray_DelvrRecp.txt: list of copies  for incoming delivery receipts
+handles.prtPrefixPath = sprintf('%s%s', outpostValByName('DirAddOns', handles.outpostNmNValues), prtPrefix);
 
 handles = learnPaneNames(handles);
 
@@ -278,27 +310,15 @@ set(handles.textSummTleMsgNo,'ToolTip', sprintf('%s\n%s',char(tt), a));
 tt = get(handles.editSummMsgNo,'ToolTip');
 set(handles.editSummMsgNo,'ToolTip', sprintf('%s\n%s',char(tt), a));
 
-
-switch lower(openTab)
-case 'summary'
-  set(handles.tbSummPane,'value',1);
-  tbSummPane_Callback(handles.tbSummPane, [], handles, []);
-case 'logPrint'
-  set(handles.tbLogPrintPane,'value',1);
-  tbLogPrintPane_Callback(handles.tbLogPrintPane, [], handles, []);
-otherwise
-  %want to open with the summary pane
-  set(handles.tbSummPane,'value',1);
-  tbSummPane_Callback(handles.tbSummPane, [], handles, []);
-end
 %place all the user controls nicely - need to be in accessible locations
 %  on the edit window which isn't suitable for use.
 initPlacement(handles);
 
-
-[incidentName, incidentDate] = readIncidentName(outpostValByName('DirScripts', handles.outpostNmNValues)) ;
+[incidentName, incidentDate, handles.last_activationNumber] = readIncidentName(outpostValByName('DirScripts', handles.outpostNmNValues)) ;
 set(handles.editIncidentName, 'string', incidentName);
 set(handles.radiobNewMsgIncidentNameDate, 'string', incidentDate);
+set(handles.editIncidentStartDate, 'string', incidentDate);
+set(handles.editActivationNum, 'string', handles.last_activationNumber);
 
 handles.findNewOutpostMsgsINI = strcat(outpostValByName('DirAddOns', handles.outpostNmNValues), 'findNewOutpostMsgs.ini');
 handles.newestTxtPathNameEx = strcat(outpostValByName('DirAddOnsPrgms', handles.outpostNmNValues), 'findNewOutpostMsgs_newest.txt');
@@ -333,14 +353,37 @@ set(handles.listboxTACAlias_0,'String', {});
 %set units to pixels so UIs will not change their size
 % adjust the background color of everything other than Edit and Listboxes to same as figure1
 for itemp = 1:length(fn)
-  if ~findstrchr('figure1', char(fn(itemp)) )
+  if ~findstrchr('figure1', char(fn(itemp)) ) & ~findstrchr('inOutpostPath', char(fn(itemp)) )
     set(getfield(handles, char(fn(itemp))), 'Units', 'pixels') ;
-    ty = get(getfield(handles, char(fn(itemp))), 'Style') ;
-    if (~findstrchr('edit', ty) & ~findstrchr('listbox', ty) )
-      set(getfield(handles, char(fn(itemp))), 'BackgroundColor', get(0,'defaultUicontrolBackgroundColor') )
-    end
-  end 
+    if ~ismember(getfield(handles, char(fn(itemp))), handles.paneHandle )
+      ty = get(getfield(handles, char(fn(itemp))), 'Style') ;
+      if (~findstrchr('edit', ty) & ~findstrchr('listbox', ty) ) & ~findstrchr('togglebuttonDone', get(getfield(handles, char(fn(itemp))), 'Tag'))
+        set(getfield(handles, char(fn(itemp))), 'BackgroundColor', get(0,'defaultUicontrolBackgroundColor') )
+      end
+    end % if ~ismember(getfield(handles, char(fn(itemp))), handles.paneHandle )
+  end % if ~findstrchr('figure1', char(fn(itemp)) )
 end % for itemp = 1:length(fn);
+
+handles = initSummItem(handles);
+
+guidata(figure1, handles);
+
+switch lower(openTab)
+case 'summary'
+  set(handles.tbSummPane,'value',1);
+  tbSummPane_Callback(handles.tbSummPane, [], handles, []);
+case 'logprint'
+  set(handles.tbLogPrintPane,'value',1);
+  tbLogPrintPane_Callback(handles.tbLogPrintPane, [], handles, []);
+case 'messageprint'
+  set(handles.tbPrtPane,'value',1);
+  tbPrtingPane_Callback(handles.tbPrtPane, [], handles, []);
+otherwise
+  %want to open with the summary pane
+  set(handles.tbSummPane,'value',1);
+  tbSummPane_Callback(handles.tbSummPane, [], handles, []);
+end
+handles = guidata(figure1);
 
 set(handles.figure1,'Position', [111.80000000000001 26.23076923076924 158.0 47.53846153846154]);
 
@@ -348,11 +391,10 @@ movegui(figure1,'onscreen');
 
 %set units to normalized to size will track anything user does to the size
 for itemp = 1:length(fn)
-  if ~findstrchr('figure1', char(fn(itemp)) )
+  if ~findstrchr('figure1', char(fn(itemp)) ) & ~findstrchr('inOutpostPath', char(fn(itemp)) )
     set(getfield(handles, char(fn(itemp))), 'Units', 'normalized') ;
   end 
 end % for itemp = 1:length(fn);
-
 
 guidata(figure1, handles);
 varargout{3} = figure1;
@@ -385,7 +427,8 @@ a = dir(strcat(mfilename,'.m'));
 codeDetail = sprintf('%s \n(running %s.m file: %s)', codeDetail, mfilename, a(1).date);
 userCancel = 1;
 %#ENDIF
-codeDetail = sprintf('%s \n\nCopyright 2009-2010 Andy Rose  KI6SEP\nAll rights reserved.', codeDetail);
+[err, errMsg, date_time, prettyDateTime, Yr] = datevec2timeStamp(now);
+codeDetail = sprintf('%s \n\nCopyright 2009-20%i Andy Rose  KI6SEP\nAll rights reserved.', codeDetail, Yr);
 
 % --------------------------------------------------------------------
 function varargout = listboxBackupLocal_Callback(h, eventdata, handles, varargin)
@@ -542,7 +585,7 @@ else %if ~val
     handles.lastMsg.min = num2str(mnt);
   end %if h_Obj
   handles.startTime = setLogStartTime(find(handles.nMstartTimeOption == handles.lastMsg.select), handles.dateTime, ...
-    outpostValByName('DirScripts', handles.outpostNmNValues), outpostValByName('DirOutpost', handles.outpostNmNValues));
+    outpostValByName('DirScripts', handles.outpostNmNValues), handles.inOutpostPath);
   handles = readNDispFindMsgLst(handles);
   guidata(handles.figure1, handles);
 end % if ~val else
@@ -555,24 +598,24 @@ if ~val
 else %if ~val
   set(h, 'enable','inactive');
   handles = alterPaneState(handles, 'off');
-  [outCopies, err, errMsg] = readRecipients(strcat(outpostValByName('DirAddOns', handles.outpostNmNValues),'outTray_copies.txt'));
+  [outCopies, err, errMsg] = readRecipients(strcat(handles.prtPrefixPath,'outTray_copies.txt'));
   configPrtCopyCB(outCopies, handles.cbPrtRadioSente, handles.cbPrtPlanSente, handles.cbPrtOrigSente)
   
-  [outCopiesPpr, err, errMsg] = readRecipients(strcat(outpostValByName('DirAddOns', handles.outpostNmNValues),'outTrayPaper_copies.txt'));
+  [outCopiesPpr, err, errMsg] = readRecipients(strcat(handles.prtPrefixPath,'outTrayPaper_copies.txt'));
   configPrtCopyCB(outCopiesPpr, handles.cbPrtRadioSentPpr, handles.cbPrtPlanSentPpr, handles.cbPrtOrigSentPpr)
   
-  [inCopies, err, errMsg] = readRecipients(strcat(outpostValByName('DirAddOns', handles.outpostNmNValues),'inTray_copies.txt'));
+  [inCopies, err, errMsg] = readRecipients(strcat(handles.prtPrefixPath,'inTray_copies.txt'));
   configPrtCopyCB(inCopies, handles.cbPrtRadioRecv, handles.cbPrtPlanRecv, handles.cbPrtAddrsRecv)
   
-  [inCopiesDelvrRecp, err, errMsg] = readRecipients(strcat(outpostValByName('DirAddOns', handles.outpostNmNValues),'inTray_DelvrRecp.txt'));
+  [inCopiesDelvrRecp, err, errMsg] = readRecipients(strcat(handles.prtPrefixPath,'inTray_DelvrRecp.txt'));
   configPrtCopyCB(inCopiesDelvrRecp, handles.cbPrtRadioDelvrRecp, handles.cbPrtPlanDelvrRecp, handles.cbPrtAddrsDelvrRecp)
   
   % the globals
-  [err, errMsg, printer] = readProcessOPM_INI(outpostValByName('DirAddOns', handles.outpostNmNValues));
+  [err, errMsg, printer] = readProcessOPM_INI(handles.prtPrefixPath);
   % the form specific - currently being applied to all forms . . 
   [err, errMsg, prtEnableRec, prtEnableSent, prtEnableDelvrRecp, ...
       copies4recv, copies4sent, copies4sentFromPaper, copies4DelvrRecp, HPL3] = ...
-    readPrintICS_213INI(outpostValByName('DirAddOns', handles.outpostNmNValues), 0);
+    readPrintICS_213INI(handles.prtPrefixPath, 0);
   
   prtEnableRec = printer.printEnable * (prtEnableRec>0) ;
   prtEnableSent = printer.printEnable * (prtEnableSent>0) ;
@@ -600,7 +643,7 @@ val = get(h, 'val');
 set(h, 'enable','inactive');
 handles = alterPaneState(handles, 'off');
 [err, errMsg, logPrintEnable, handles.logPrint_mntIntr, handles.logPrint_mnmToPrint, handles.logPrint_msgNums]...
-  = readLogPrintINI(outpostValByName('DirAddOns', handles.outpostNmNValues));
+  = readLogPrintINI(handles.prtPrefixPath);
 set(handles.cbLogPrintEnable_0, 'value', logPrintEnable);
 set(handles.editLogPrint_mntIntr, 'value', handles.logPrint_mntIntr);
 set(handles.editLogPrint_mnmToPr, 'value', handles.logPrint_mnmToPrint);
@@ -623,7 +666,32 @@ else
 end
 % --------------------------------------------------------------------
 function varargout = editIncidentName_Callback(h, eventdata, handles, varargin)
-[err, errMsg, incidentDate] = writeIncidentName(get(h, 'string'), outpostValByName('DirScripts', handles.outpostNmNValues)) ;
+updateIncident(handles);
+% --------------------------------------------------------------------
+function varargout = editIncidentStartDate_Callback(h, eventdata, handles, varargin)
+updateIncident(handles);
+% --------------------------------------------------------------------
+function varargout = editActivationNum_Callback(h, eventdata, handles, varargin)
+%if activation number has changed, give the operator the opportunity to
+%  save some typing by pre-loading the date to "now"
+if (~strcmp(handles.last_activationNumber, get(handles.editActivationNum, 'string')))
+  [err, errMsg, date_time, prettyDateTime] = datevec2timeStamp(now);
+  a = findstrchr(' ', prettyDateTime);
+  prettyDateTime = prettyDateTime(1:a(1));
+  a = sprintf('You have changed the Activation Number.  Would you like to\n');
+  a = sprintf('%schange the Activation Date to \n"%s" from\n"%s"', a, prettyDateTime, char(get(handles.editIncidentStartDate, 'string')));
+  button = questdlg(sprintf('%s', a),'Activation Date','Change','Leave','Change');
+  if strcmp(button,'Change')
+    set(handles.editIncidentStartDate, 'string', prettyDateTime)
+  end
+end %if (~strcmp(handles.last_activationNumber, get(handles.editActivationNum, 'string'))
+updateIncident(handles);
+% --------------------------------------------------------------------
+function updateIncident(handles)
+[err, errMsg, incidentDate] = writeIncidentName(get(handles.editIncidentName, 'string'), ...
+  get(handles.editIncidentStartDate, 'string'), ...
+  get(handles.editActivationNum, 'string'), ...
+  outpostValByName('DirScripts', handles.outpostNmNValues)) ;
 if err
   errordlg(errMsg);
 end
@@ -724,19 +792,29 @@ lines= 1;
 def     = {''};
 answer  = inputdlg(prompt,title,lines,def);
 if length(char(answer))
-  cl = get(h_listBox,'String');
-  val = length(cl)+1;
-  cl(val) = answer;
-  set(h_listBox,'String', cl);
-  set(h_listBox,'value', val);
-  setUpdated(thisPaneKey, handles)
+  addBUlocation(answer, h_listBox, thisPaneKey, handles);
 end
 % --------------------------------------------------------------------
+function uiEnterPath(whichSource, h_listBox, thisPaneKey, handles);
+[fname, newpath] = uiputfile('Backup Location', whichSource);
+if isequal(fname,0)
+  return
+end
+addBUlocation({newpath}, h_listBox, thisPaneKey, handles);
+% --------------------------------------------------------------------
+function addBUlocation(answer, h_listBox, thisPaneKey, handles);
+cl = get(h_listBox,'String');
+val = length(cl)+1;
+cl(val) = answer;
+set(h_listBox,'String', cl);
+set(h_listBox,'value', val);
+setUpdated(thisPaneKey, handles)
+% --------------------------------------------------------------------
 function varargout = pbBULclBrowseLocation_Callback(h, eventdata, handles, varargin)
-
-
-
-
+uiEnterPath('Back up location for Outpost on this computer', handles.listboxBackupLocal, 'BULcl', handles);
+% --------------------------------------------------------------------
+function varargout = pbBURmtBrowseLocation_Callback(h, eventdata, handles, varargin)
+uiEnterPath('Back up location for another computer''s Outpost', handles.listboxBackupRemote, 'BURmt', handles);
 % --------------------------------------------------------------------
 function varargout = pbBULclDelete_Callback(h, eventdata, handles, varargin)
 [cl] = confirmDelete(handles.listboxBackupLocal, 'BULcl', handles,'Backup Location');
@@ -745,12 +823,6 @@ listboxBackupLocal_Callback(handles.listboxBackupLocal, [], handles, [])
 function varargout = pbBURmtEnter_Callback(h, eventdata, handles, varargin)
 enterPath('remote', handles.listboxBackupRemote, 'BURmt', handles);
 listboxBackupRemote_Callback(handles.listboxBackupRemote, [], handles, [])
-% --------------------------------------------------------------------
-function varargout = pbBURmtBrowseLocation_Callback(h, eventdata, handles, varargin)
-
-
-
-
 % --------------------------------------------------------------------
 function varargout = pbBURmtDelete_Callback(h, eventdata, handles, varargin)
 [cl] = confirmDelete(handles.listboxBackupRemote, 'BURmt', handles,'Backup Location');
@@ -779,6 +851,10 @@ if handles.latesTmRead
     deleteIfExist(strcat(pathstr, 'findNewOutpostMsgs_newestLast.txt'));
     deleteIfExist(strcat(pathstr, 'findNewOutpostMsgs.mat'));
     deleteIfExist(strcat(pathstr, 'findNewOutpostMsgsLast.mat'));
+    [err, errMsg, date_time, prettyDateTime, Yr] = datevec2timeStamp(now);
+    a = findstrchr('_', date_time);
+    processLog = sprintf('%sprocess_%s.log', outpostValByName('DirAddOns', handles.outpostNmNValues), date_time(1:a-1));
+    deleteIfExist(processLog);
   end
   %update
   [handles] = readNDispFindMsgLst(handles);
@@ -837,6 +913,7 @@ else
 end
 % --------------------------------------------------------------------
 function handles = alterPaneState(handles, paneList, vis, h_On);
+aa = [];
 if nargin < 3
   vis = paneList;
   paneList = handles.paneNames;
@@ -856,6 +933,10 @@ else
       set(handles.togglebuttonSave,'visible','off');
     end
     guidata(handles.figure1, handles);
+    aa = get(handles.paneHandle(a),'BackgroundColor');
+    set(handles.frame1, 'BackgroundColor',  aa)
+  else 
+    aa = [];
   end
 end
 
@@ -878,6 +959,12 @@ for fieldNdx = 1:length(fn)
       else % if ( ((a(1) + 3) == length(thisField)) & (1 == findstrchr('tb', thisField)) )
         %.. not pane selection button: make it visible!
         set(getfield(handles,thisField), 'visible', vis);
+        if aa
+          if ~findstrchr(get(getfield(handles,thisField), 'style'), 'listbox') & ...
+              ~findstrchr(get(getfield(handles,thisField), 'style'), 'edit')
+            set(getfield(handles,thisField), 'BackgroundColor', aa)
+          end % if ~findstrchr(get(getfield(handles,thisField), 'style'), 'listbox')
+        end
       end % if ( ((a(1) + 3) == length(thisField)) & (1 == findstrchr('tb', thisField)) ) else
     end % if findstrchr(thisPane, thisField)
   end %for paneNdx = 1:length(paneList)
@@ -976,8 +1063,8 @@ set(handles.frameSumm3, 'Position', posit);
 
 % --------------------------------------------------------------------
 function summStatus(handles);
-%refresh the status from Outpost
-[err, errMsg, handles.outpostNmNValues] = OutpostINItoScript(outpostValByName('DirOutpost', handles.outpostNmNValues)); 
+%refresh the status from Outpost  
+[err, errMsg, handles] = readOutINI(handles.inOutpostPath, handles, mfilename);
 guidata(handles.figure1, handles);
 %current settings
 opCall = outpostValByName('StationID', handles.outpostNmNValues);
@@ -988,44 +1075,121 @@ set(handles.editSummOpCall, 'string', opCall);
 tacCall = outpostValByName('TacticalCall', handles.outpostNmNValues);
 % tactical enable (1) / disabled (0)
 TCnPEnabled = outpostValByName('TCnPEnabled', handles.outpostNmNValues);
+ud = get(handles.editSummTacIDErr,'UserData');
 if strcmp(TCnPEnabled,'1')
   a = 'enabled';
-else
+  handles.expectedID = tacCall;
+  % TacCall format for County, cities, and agencies is <agency ID>EOC
+  %  while the entities within those groups will be <agency ID><group ID>
+  % example:  MTVEOC has tactical ID "MTV" and MTVFS1 has tactical ID "FS1"
+  if (4 == findstrchr('EOC', upper(handles.expectedID)))
+    handles.expectedID = handles.expectedID(1:3);
+  end
+  % ud is applied in a few lines to "handles.editSummTacIDErr"
+  ud.h_call = handles.editSummTacCall;
+else % if strcmp(TCnPEnabled,'1')
   a = 'disabled';
-end
+  handles.expectedID = opCall;
+  % ud is applied in abit to "handles.editSummTacIDErr"
+  ud.h_call = handles.editSummOpCall;
+end % if strcmp(TCnPEnabled,'1') else
 set(handles.editSummTacCall, 'string',sprintf('%s (%s)', tacCall, a));
+b = max(1:length(handles.expectedID)-2);
+handles.expectedID = handles.expectedID(b:length(handles.expectedID));
 
-TacID = outpostValByName('TacID', handles.outpostNmNValues);
-set(handles.editSummTacID, 'string', TacID);
+handles.TacID = outpostValByName('TacID', handles.outpostNmNValues);
+a = get(handles.editSummTacID, 'ToolTip');
+a = sprintf('%s\n\nUsed as part of message numbering.', a);
+set(handles.editSummTacID, 'string', handles.TacID);
+
+if strcmp(upper(handles.expectedID), upper(handles.TacID))
+  set(handles.editSummTacIDErr,'Visible','off','ToolTip','')
+else % if strcmp(upper(handles.expectedID), upper(handles.TacID))
+  ud.origTACIDBack = get(handles.editSummTacID,'BackgroundColor');
+  ud.origMsgNoTacBack = get(handles.textSummMsgNoTac,'BackgroundColor');
+  ud.origCallBack = get(ud.h_call,'BackgroundColor');
+  a = sprintf('Warning:\nThe Call sign ends with "%s"', handles.expectedID);
+  a = sprintf('%s\n but the Tactical ID is "%s".', a, handles.TacID);
+  a = sprintf('%s\n\nThis may or may not be OK - that is up to you - it is unusual.', a);
+  set(handles.editSummTacIDErr,'Style','pushbutton','Visible','on',...
+    'ToolTip', a, 'UserData', ud,'BackgroundColor', ud.backColor)
+  set(handles.editSummTacID,'BackgroundColor', ud.backColor)
+  set(handles.textSummMsgNoTac,'BackgroundColor', ud.backColor)
+  set(ud.h_call,'BackgroundColor', ud.backColor)
+end % if strcmp(upper(handles.expectedID), upper(handles.TacID)) else
 
 NxtMsgNo = outpostValByName('ReportMsgNo', handles.outpostNmNValues);
-set(handles.editSummMsgNo, 'string', NxtMsgNo);
-set(handles.textSummMsgNoTac, 'string', TacID);
+% SLS=0 without hypenation 
+% SLS=1 with hypenation
+% SLS=2 date time format
+[SLS, errMsg, handles] = outValByNameReload('SLS', handles, mfilename);
+if length(errMsg)
+  errMsg = sprintf('%s>%s', mfilename, errMsg);
+  fprintf('\n** Error: %s', errMsg);
+  return
+end
+% compare setting/format of numbering with standard
+% Only have "prompt", "promptState", & "fullPrompt" to pass to compare code - not used again
+promptState = {'number without hypenation','number with hypenation','date time format'};
+prompt = {''};
+fullPrompt = makePrompt(prompt, promptState, SLS);
+ToolTip = compareToStandard(handles, fullPrompt, get(handles.editSummMsgNo,'ToolTip'), 'SLS', handles.editSummMsgNo, prompt, promptState);
+% update ToolTip in case it changed
+set(handles.editSummMsgNo,'ToolTip',ToolTip)
+msgIDPrfx = handles.TacID;
+msgID = NxtMsgNo;
+SLS = str2num(SLS);
+if (SLS == 1)
+  [SLSChar, errMsg, handles] = outValByNameReload('SLSChar', handles, mfilename);
+  if length(errMsg)
+    errMsg = sprintf('%s>%s', mfilename, errMsg);
+    fprintf('\n** Error: %s', errMsg);
+    return
+  end
+  msgIDPrfx = strcat(msgIDPrfx, SLSChar);
+end
+if (SLS > 1)
+  [SLFormat, errMsg, handles] = outValByNameReload('SLFormat', handles, mfilename);
+  if length(errMsg)
+    errMsg = sprintf('%s>%s', mfilename, errMsg);
+    fprintf('\n** Error: %s', errMsg);
+    return
+  end
+  msgID = sprintf('<%s>' ,SLFormat);
+end % switch sls
+set(handles.editSummMsgNo, 'string', msgID);
+set(handles.textSummMsgNoTac, 'string', msgIDPrfx);
 LMIflag = outpostValByName('LMIflag', handles.outpostNmNValues);
 if length(LMIflag)
   %Outpost supports Local Message Numbers - hide eLogger's support
   set([handles.textSummRcvMsgNoTac], 'visible','off')
-  if (1 == outpostValByName('AutoMsgNum', handles.outpostNmNValues))
-    set(handles.textSummTleRcvMsgNo, 'string','Outgoing #: Enabled')
-  else %if (1 == outpostValByName('AutoMsgNum', handles.outpostNmNValues))
-    set(handles.textSummTleRcvMsgNo, 'string','Outgoing #: Disabled')
-  end % if (1 == outpostValByName('AutoMsgNum', handles.outpostNmNValues)) else
+  if ('1' == outpostValByName('AutoMsgNum', handles.outpostNmNValues))
+    fullPrompt = 'Outgoing #: Enabled';
+  else %if ('1' == outpostValByName('AutoMsgNum', handles.outpostNmNValues))
+    fullPrompt = 'Outgoing #: Disabled';
+  end % if ('1' == outpostValByName('AutoMsgNum', handles.outpostNmNValues)) else
+  ToolTip = compareToStandard(handles, fullPrompt, get(handles.textSummTleRcvMsgNo, 'ToolTip'), 'AutoMsgNum', ...
+    handles.textSummTleRcvMsgNo, {'Outgoing #'}, {'Disabled','Enabled'});
+  set(handles.textSummTleRcvMsgNo, 'string', fullPrompt, 'ToolTip', ToolTip)
   a = get(handles.textSummTleRcvMsgNo, 'Position');
   b = get(handles.editSummRcvMsgNo, 'Position');
-  if (LMIflag)
-    set(handles.editSummRcvMsgNo, 'string','Incoming #: Enabled','Style','text')
-  else % if (LMIflag)
-    set(handles.editSummRcvMsgNo, 'string','Incoming #: Disabled','Style','text')
-  end % if (LMIflag)else
-  set(handles.editSummRcvMsgNo, 'Position', [b(1) a(2) b(3) a(4)])
+  if (str2num(LMIflag))
+    fullPrompt = 'Incoming #: Enabled';
+  else % if (str2num(LMIflag))
+    fullPrompt = 'Incoming #: Disabled';
+  end % if (str2num(LMIflag)) else
+  set(handles.editSummRcvMsgNo, 'BackgroundColor', get(handles.tbSummPane,'BackgroundColor'))
+  ToolTip = compareToStandard(handles, fullPrompt, get(handles.editSummRcvMsgNo, 'ToolTip'), 'LMIflag', ...
+    handles.editSummRcvMsgNo, {'Incoming #'}, {'Disabled','Enabled'});
+  set(handles.editSummRcvMsgNo, 'string', fullPrompt, 'ToolTip', ToolTip, 'Position', [b(1) a(2) b(3) a(4)], 'Style','text')
 else % if length(LMIflag)
   cnt = readRecvMsgNum(handles.outpostNmNValues);
-  if (1 == outpostValByName('AutoMsgNum', handles.outpostNmNValues))
+  if ('1' == outpostValByName('AutoMsgNum', handles.outpostNmNValues))
     set(handles.editSummRcvMsgNo, 'string', sprintf('%i', cnt));
-  else %if (1 == outpostValByName('AutoMsgNum', handles.outpostNmNValues))
+  else %if ('1' == outpostValByName('AutoMsgNum', handles.outpostNmNValues))
     set(handles.editSummRcvMsgNo, 'string', sprintf('%i (disabled)', cnt));
-  end %if (1 == outpostValByName('AutoMsgNum', handles.outpostNmNValues)) else
-  set(handles.textSummRcvMsgNoTac, 'string', TacID);
+  end %if ('1' == outpostValByName('AutoMsgNum', handles.outpostNmNValues)) else
+  set(handles.textSummRcvMsgNoTac, 'string', handles.TacID);
 end % if length(LMIflag) else
 
 % TCwPEnabled = outpostValByName('TCwPEnabled', handles.outpostNmNValues);
@@ -1045,6 +1209,60 @@ set(handles.editSummState, 'string', State);
 TacLoc = outpostValByName('TacLoc', handles.outpostNmNValues);
 set(handles.editSummLoc, 'string', TacLoc);
 
+%======
+%  The following are grouped based on the Outpost pane they are on.  This
+%  allows the tool tip to be the same.  It also makes it easier to work on this
+%  code with respect to Outpost.
+%  Each grouping starts with "%======" followed by the toolTip content.
+toolTip = 'Set via Outpost: Tools->Message Settings: Tracking';
+handles = addSummItem(handles, 'AutoDelvReceipt', '', {'Do Not Send Delivery Receipt', 'Auto Send Delivery Receipt'}, ...
+  toolTip, 1);
+handles = addSummItem(handles, 'AutoReadReceipt', '', {'Do Not Send Read Receipt', 'Auto Send Read Receipt'}, ...
+  toolTip, 1);
+handles = addSummItem(handles, 'ReqDelReceipt', '', {'Do Not Request Delivery Receipt', 'Request Delivery Receipt'}, ...
+  toolTip, 1);
+handles = addSummItem(handles, 'ReqReadReceipt', '', {'Do Not Request Read Receipt', 'Request Read Receipt'}, ...
+  toolTip, 1);
+
+%======
+toolTip = 'Set via Outpost: Tools->Message Settings: Adv';
+handles = addSummItem(handles, 'OpdEnable', '', {'Do Not Auto-start OpDirect', 'Auto-start OpDirect'}, ...
+  toolTip, 1);
+handles = addSummItem(handles, 'PFEnable', '', {'Never open Recv''d PacFORM in browser', 'Prompt to open Recv''d PacFORM in browser','Open Recv''d PacFORM in browser'}, ...
+  toolTip, 1);
+handles = addSummItem(handles, 'LCLPFEnable', '', {'Never open Local PacFORM in browser', 'Prompt to open Local PacFORM in browser','Open Local PacFORM in browser'}, ...
+  toolTip, 1);
+
+%======
+toolTip = 'Set via Outpost: Tools->Send/Receive Settings: Retrieving';
+handles = addSummItem(handles, 'GetPrivate', '', {'Do not Retrieve Private Messages', 'Retrieve Private Messages'}, ...
+  toolTip, 1);
+handles = addSummItem(handles, 'GetNts', '', {'Do not Retrieve NTS Messages', 'Retrieve NTS Messages'}, ...
+  toolTip, 1);
+handles = addSummItem(handles, 'GetBC', '', {'Do not Retrieve new Bulletins', 'Retrieve new Bulletins'}, ...
+  toolTip, 1);
+handles = addSummItem(handles, 'GetFiltered', 'Retrieve Selected Bulletins', {'disabled', outpostValByName('Filters', handles.outpostNmNValues)}, ...
+  toolTip, 1);
+
+%======
+toolTip = 'Set via Outpost: Tools->Send/Receive Settings: Receiving';
+handles = addSummItem(handles, 'KeepOnBbs', 'Messages', {'Delete from BBS after retrieving', 'Leave on BBS after retrieving'}, ...
+  toolTip, 1);
+%======
+toolTip = 'Set via Outpost: Tools->Message Settings: New Messages';
+handles = addSummItem(handles, 'NewMsgDefault', '', {'Default new message: Private', 'Default new message: Bulletin'}, ...
+  toolTip, 1);
+
+[outVar, errMsg] = outValByNameReload('DefaultDest', handles, mfilename);
+handles = addSummItem(handles, 'EnableDD', 'Default destination', {'disabled', outVar}, ...
+  toolTip, 1);
+
+%======
+toolTip = '';
+handles = addSummItem(handles, 'Version', 'Outpost Version', {}, toolTip, 2);
+
+%======
+guidata(handles.figure1, handles);
 % --------------------------------------------------------------------
 function varargout = editSummLoc_Callback(h, eventdata, handles, varargin)
 
@@ -1131,7 +1349,8 @@ else %if ~val
   set(h, 'enable','inactive');
   handles = alterPaneState(handles, 'off');
   handles = alterPaneState(handles, {'TACAlias'}, 'on', h);
-  [tacAlias, tacCall, txtLineArray, errMsg] = readTacCallAlias(outpostValByName('DirAddOns', handles.outpostNmNValues));
+  % [tacAlias, tacCall, txtLineArray, errMsg, fname, tacType]
+  [tacAlias, tacCall, txtLineArray, errMsg, fname, tacType] = readTacCallAlias(outpostValByName('DirAddOns', handles.outpostNmNValues));
   ud = get(handles.listboxTACAlias_0,'UserData');
   if length(tacAlias)
     ud.err = 0;
@@ -1454,13 +1673,13 @@ if (handles.prtMstrPpr | handles.prtMstrSent | handles.prtMstrSentPpr | handles.
     prtEnableDelvrRecp = 0;
   end
   HPL3 = 0;
-  [err, errMsg] = writePrintICS_213INI(outpostValByName('DirAddOns', handles.outpostNmNValues), ...
+  [err, errMsg] = writePrintICS_213INI(handles.prtPrefixPath, ...
     prtEnableRec*blankPaper, prtEnableSent*blankPaper, copies4recv, copies4sent, copies4sentFromPaper, HPL3, ...
     copies4DelvrRecp, prtEnableDelvrRecp*blankPaper);
   
   printerPort = 'LPT1:';
   qualLetter = 0;
-  [err, errMsg] = writeProcessOPM_INI(outpostValByName('DirAddOns', handles.outpostNmNValues), ...
+  [err, errMsg] = writeProcessOPM_INI(handles.prtPrefixPath, ...
     (prtEnableRec | prtEnableSent)*blankPaper, HPL3, printerPort, qualLetter);
 end %if (handles.prtMstrPpr | handles.prtMstrSent | handles.prtMstrSentPpr | prtMstrRecvDelvrRecp)
 handles.prtRecv = 0;
@@ -1479,7 +1698,7 @@ handles.dateTime = datestr(datenum(sprintf('%i/%i/%s %s:%s', handles.lastMsg.mon
   handles.lastMsg.year, handles.lastMsg.hr, handles.lastMsg.min))) ;
 handles = setUpdated('NewMsg', handles);
 handles.startTime = setLogStartTime(find(handles.nMstartTimeOption == handles.lastMsg.select), handles.dateTime, ...
-  outpostValByName('DirScripts', handles.outpostNmNValues), outpostValByName('DirOutpost', handles.outpostNmNValues));
+  outpostValByName('DirScripts', handles.outpostNmNValues), handles.inOutpostPath);
 handles = readNDispFindMsgLst(handles);
 guidata(handles.figure1, handles)
 % --------------------------------------------------------------------
@@ -1502,7 +1721,7 @@ function [err, errMsg] = save_BURmt(handles)
 % --------------------------------------------------------------------
 function [err, errMsg] = save_LogPrint(handles)
 logPrintEnable = get(handles.cbLogPrintEnable_0, 'value');
-[err, errMsg] = writeLogPrintINI(outpostValByName('DirAddOns', handles.outpostNmNValues), ...
+[err, errMsg] = writeLogPrintINI(handles.prtPrefixPath, ...
   logPrintEnable, handles.logPrint_mntIntr, handles.logPrint_mnmToPrint, handles.logPrint_msgNums);
 % --------------------------------------------------------------------
 function varargout = tbPrtMstrRecv_Callback(h, eventdata, handles, varargin)
@@ -1515,7 +1734,7 @@ end
 configPrt('Recv', val, handles, h);
 if val 
   %reload Outpost's settings just in case they've changed
-  [err, errMsg, handles.outpostNmNValues] = OutpostINItoScript(outpostValByName('DirOutpost', handles.outpostNmNValues) ); 
+  [err, errMsg, handles] = readOutINI(handles.inOutpostPath, handles, mfilename);
   if str2num(outpostValByName('PrintOnReceipt', handles.outpostNmNValues))
     a = sprintf('Double printing:\n\n');
     a = sprintf('%sOutpost is also set to print received messages\n', a);
@@ -1535,7 +1754,7 @@ end
 configPrt('Sente', val, handles, h);
 if val 
   %reload Outpost's settings just in case they've changed
-  [err, errMsg, handles.outpostNmNValues] = OutpostINItoScript(outpostValByName('DirOutpost', handles.outpostNmNValues) ); 
+  [err, errMsg, handles] = readOutINI(handles.inOutpostPath, handles, mfilename);
   if str2num(outpostValByName('PrintOnSend', handles.outpostNmNValues))
     a = sprintf('Double printing:\n\n');
     a = sprintf('%sOutpost is also set to pringt sent messages\n', a);
@@ -1678,7 +1897,7 @@ end
 if get(handles.cbPrtAddrsRecv, 'val')
   list(length(list) + 1) = a(3);
 end
-[err, errMsg] = writeRecipients(strcat(outpostValByName('DirAddOns', handles.outpostNmNValues),'inTray_copies.txt'), list);
+[err, errMsg] = writeRecipients(strcat(handles.prtPrefixPath,'inTray_copies.txt'), list);
 % --------------------------------------------------------------------
 function [err, errMsg] = writeDelvrRecp_213(handles)
 a = {'RADIO','PLANNING','ADDRESSEE'} ;
@@ -1692,7 +1911,7 @@ end
 if get(handles.cbPrtAddrsDelvrRecp, 'val')
   list(length(list) + 1) = a(3);
 end
-[err, errMsg] = writeRecipients(strcat(outpostValByName('DirAddOns', handles.outpostNmNValues),'inTray_DelvrRecp.txt'), list);
+[err, errMsg] = writeRecipients(strcat(handles.prtPrefixPath,'inTray_DelvrRecp.txt'), list);
 % --------------------------------------------------------------------
 function [err, errMsg] = writeSenteRecipients_213(handles)
 [err, errMsg] = writeSentRecipients(handles, handles.cbPrtRadioSente, ...
@@ -1714,7 +1933,7 @@ end
 if get(h_orig, 'val')
   list(length(list) + 1) = a(3);
 end
-[err, errMsg] = writeRecipients(strcat(outpostValByName('DirAddOns', handles.outpostNmNValues), fname), list);
+[err, errMsg] = writeRecipients(strcat(handles.prtPrefixPath, fname), list);
 % --------------------------------------------------------------------
 function varargout = editLogPrint_mntIntr_Callback(h_obj, eventdata, handles, varargin)
 [err] = getCheckNumValEditBox(h_obj, handles.logPrint_mntIntr, handles, 0);
@@ -1797,14 +2016,6 @@ guidata(handles.figure1, handles);
 function varargout = togglebuttonDone_Callback(h, eventdata, handles, varargin)
 figure1_CloseRequestFcn(gcbo,[],guidata(gcbo))
 % --------------------------------------------------------------------
-
-
-
-% --------------------------------------------------------------------
-
-
-
-% --------------------------------------------------------------------
 function varargout = tbPrtMstrRecvDelvrRecp_Callback(h, eventdata, handles, varargin)
 %pass in 4th variable (i.e. varargin) to disable "save" tags
 val = get(h, 'value');
@@ -1825,4 +2036,161 @@ setUpdated('Prt', handles)
 function varargout = cbPrtAddrsDelvrRecp_Callback(h, eventdata, handles, varargin)
 handles.prtDelvrRecp = 1 ;
 setUpdated('Prt', handles)
+% --------------------------------------------------------------------
+function varargout = editSummTacIDErr_Callback(h, eventdata, handles, varargin)
+a = sprintf('Warning.\nThe call sign ends with "%s"', handles.expectedID);
+a = sprintf('%s\nbut the Tactical ID is "%s".', a, handles.TacID);
+a = sprintf('%s\n\nThis may or may not be OK - that is up to you - but it is unusual.', a);
+a = sprintf('%s\n\nChanging either of these is done through Outpost.', a);
+
+button = questdlg(a,'Call Sign vs TacID','OK','Hide','OK');
+if strcmp(button,'Hide')
+  ud = get(handles.editSummTacIDErr,'UserData');
+  set(handles.editSummTacID,'BackgroundColor', ud.origTACIDBack)
+  set(handles.textSummMsgNoTac,'BackgroundColor', ud.origMsgNoTacBack)
+  set(ud.h_call,'BackgroundColor',ud.origCallBack)
+  set(handles.editSummTacIDErr,'Visible', 'off');
+end
+% --------------------------------------------------------------------
+function handles = initSummItem(handles);
+%learn the horizontal border/spacing being used from "guide"
+pos1 = get(handles.textSummTleOpName_0,'position');
+pos2 = get(handles.textSummTleOpCall,'position');
+handles.vertBorder = 0; %pos1(2) - (pos2(2) + pos2(4));
+pos2 = get(handles.editSummOpName,'position');
+handles.horizBorder = pos2(1) - (pos1(1) + pos1(3));
+%The first item of the first column already exists: set the memory variable
+pos1 = get(handles.textSummAutoDelvReceipt,'position');
+handles.summLastItemPos(1, [1:4]) = pos1;
+%The first item of the second column does not exist: initialize so whenever it is added
+% it will be aligned vertically to the first item of the left column & horizontally to
+% the right of the end.
+% adjust the horizontal 
+pos1(1) = pos1(1) + pos1(3) + handles.horizBorder;
+% adjust the vertical: to be above the existing col_1 UI ....
+%   by the amount we'll move down in "add
+pos1(2) = pos1(2) + pos1(4) + handles.vertBorder;
+handles.summLastItemPos(2, [1:4]) = pos1 ;
+% --------------------------------------------------------------------
+function handles = addSummItem(handles, outpostName, prompt, promptState, ToolTip, dispColumn);
+% Creates a textObject named "textSummTle<outpostName>"
+%  outpostName: name of variable as it appears in Outpost.INI
+%      will be basis for object name and will be used to look up 
+%      value from that .INI
+%  prompt: cell containing the main prompt
+%  promptState: either null: <prompt>
+%                 or a 2 element cell array to create content: <prompt>: <prompt suffix>
+%              {1}: prompt suffix if Outpost value 0, 
+%              {2}: prompt suffix if Outpost value 1,
+%  ToolTip: applied to textObject
+%  dispCol: column 1 is the left & 2 is the right
+
+objName = sprintf('textSumm%s', outpostName) ;
+if ~iscell(prompt)
+  prompt = {prompt};
+end
+[outVar, errMsg] = outValByNameReload(outpostName, handles, mfilename);
+if length(promptState)
+  %want to size the box to the longest prompt
+  mx = 1;
+  for itemp = 2:length(promptState)
+    if length(promptState{mx}) < length(promptState{itemp})
+      mx = itemp;
+    end % if length(sizerPrompt) < length(promptState{itemp})
+  end % for itemp = 2:length(promptState)
+  %this will be used to size the box
+  sizerPrompt = makePrompt(prompt, promptState, num2str(mx-1));
+  %this prompt will be shown to the user
+  fullPrompt = {makePrompt(prompt, promptState, outVar)};
+else % if length(promptState)
+  sizerPrompt = sprintf('%s: %s', prompt{1}, outVar) ;
+  fullPrompt = {sizerPrompt} ;
+end % if length(promptState) else
+%if object doesn't exist, create it
+if ~ismember(objName, fieldnames(handles))
+  %Set the position for the object we're adding
+  pos2 = handles.summLastItemPos(dispColumn, :);
+  handles.summLastItemPos(dispColumn, [1:4]) = [pos2(1), (pos2(2) - pos2(4) - handles.vertBorder), pos2(3), pos2(4)];
+  opts = struct('Style', 'text', 'parent', handles.figure1,'units','pixels', ...
+    'fontName', 'MS Sans Serif', 'fontUnits', 'points', 'fontSize', get(handles.textSummTleOpName_0,'FontSize'));
+  %  This is equivalent to the syntax "handles.field = v"
+  newHandle = uicontrol(opts, 'position', handles.summLastItemPos(dispColumn, :), 'fontWeight', 'normal', ...
+    'BackgroundColor', get(handles.textSummTleOpName_0, 'BackgroundColor'),'HorizontalAlignment', 'Right') ;
+  handles = setfield(handles, objName, newHandle);
+  % format the actual prompt
+  [outstring, newpos] = textwrap(newHandle, fullPrompt);
+  % adjust the box size based on the longest prompt
+  [outstr, newpos] = textwrap(newHandle, {sizerPrompt});
+  %if the text had to wrap to another line...
+  if length(outstr) > length(fullPrompt)
+    %make the box (& therefore the line) taller
+    % (a) move down
+    handles.summLastItemPos(dispColumn, 2) = handles.summLastItemPos(dispColumn, 2) - newpos(4) + handles.summLastItemPos(dispColumn, 4);
+    % (b) make taller
+    handles.summLastItemPos(dispColumn, 4) = newpos(4);
+    set(newHandle,'Position', handles.summLastItemPos(dispColumn,:));
+  end % if length(outstring) > length(a)  handles.tacCall
+else % if ~ismember('fig', fieldnames(handles))
+  % UI exists already: get its handle so we can update its contents
+  fn = fieldnames(handles);
+  newHandle = getfield(handles, char(fn(find(ismember(fn, objName)))));
+  outstring = fullPrompt;
+end % if ~ismember('fig', fieldnames(handles)) else
+if length(promptState)
+  ToolTip = compareToStandard(handles, fullPrompt, ToolTip, outpostName, newHandle, prompt, promptState);
+end % if length(promptState)
+set(newHandle, 'string', outstring, 'ToolTip', ToolTip)
+
+% % test if bottom of new row projects into footer area.
+% pF = get(handles.frameFooter, 'position');
+% % if bottom of new row is below top of footer. . .
+% pTemp = handles.positNeigh(2) ;
+% %re-establish the basic height
+% if ( (pF(2) + pF(4)) > pTemp )
+%   %position is into the footer
+%   %  resize the window by the amount the row goes into the footer... 
+%   scrnAdj = (pF(2) + pF(4)) - pTemp + handles.brdr;
+%   pos = get(handles.figure1,'Position');
+%   pos(2) = pos(2) - scrnAdj; %move down
+%   pos(4) = pos(4) + scrnAdj; %make taller (i.e. don't move top)
+%   posOf = rowPos(handles) ;
+%   % if new position is below the screen bottom...
+%   pSc = get(0,'ScreenSize') ;
+%   if (pos(2) < pSc(2))
+%     % if window height is not larger than screen
+%     if (pSc(4) <= pSc(4) )
+%       % move window bottom up
+%       pos(2) = pSc(2) ;
+%     end % if (pSc(4) <= pSc(4) )
+%   end % if (pos(2) < pSc(2))
+%   set(handles.figure1,'Position', pos);
+%   [posOf, handles] = rowPos(handles, posOf, scrnAdj) ;
+% end % if ( (pF(2) + pF(4)) > pTemp )
+
+
+% --------------------------------------------------------------------
+function [ToolTip] = compareToStandard(handles, fullPrompt, ToolTip, outVarName, thisHandle, prompt, promptState)
+% compare setting with the settings from the standard file...
+if ~length(handles.outINIref)
+  return
+end
+stdVal = outpostValByName(outVarName, handles.outINIrefNmNValues);
+%.... if this item is defined in the standard reference file (if don't care, won't be defined)
+%Comparison is based on the comparing the prompts that are created.  This assures that
+%  a prompt that is built from mroe than one Outpost variable will be properly tested.
+if length(stdVal)
+  a = makePrompt(prompt, promptState, stdVal);
+  if ~strcmp(a, fullPrompt)
+    ud = get(handles.editSummTacIDErr,'UserData');
+    set(thisHandle, 'BackgroundColor', ud.backColor)
+    ToolTip = sprintf('%s\n\n>>  Non-standard value! standard: %s  <<', ToolTip, a);
+  end % if ~strcmp(a, fullPrompt)
+end % if ~findstrchr('not found in Outpost.INI', stdVal)
+% --------------------------------------------------------------------
+function [fullPrompt] = makePrompt(prompt, promptState, val)
+if length(prompt{1})
+  fullPrompt = sprintf('%s: %s', prompt{1}, promptState{1+str2num(val)}) ;
+else % if length(prompt{1})
+  fullPrompt = promptState{1+str2num(val)} ;
+end % if length(prompt{1}) else
 % --------------------------------------------------------------------

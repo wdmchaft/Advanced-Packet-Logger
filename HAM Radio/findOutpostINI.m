@@ -78,7 +78,7 @@ else % if notPassedIn
     [pathstr,name,ext,versn] = fileparts(thisDir);
     if ~length(name) & ~length(ext)
       a = sprintf('%spathToOutpost.txt', endWithBackSlash(thisDir) );
-      [netDrive, pD, slashAt, fPath] = lcl_readPathOut(a);
+      [netDrive, pD, slashAt, fPath] = lcl_readPathOut(a, netDrive, presentDrive);
       if length(fPath)
         return
       end
@@ -125,10 +125,35 @@ for driveNdx = 0:length(validDrives)
     if (fid > 0) | netDrive
       fprintf('found!');
       break
-    end % if (fid > 0) | netDrive
+    else % if (fid > 0) | netDrive
+      %look for "Outpost.conf". . 
+      fid2 = fopen(sprintf('%sOutpost.conf', fPath), 'r');
+      % if found...
+      if (fid2 > 0)
+        % .. read it until the path to outpost's data directories is located
+        while (1 & ~feof(fid2))
+          textLine = fgetl(fid2);
+          if (1 == findstrchr(lower(textLine), 'datadir'))
+            fPath = endWithBackSlash(textLine((findstrchr('=', textLine)+1):length(textLine)) );
+            %confirm existence of Outpost.ini
+            fid = fopen(sprintf('%sOutpost.ini', fPath), 'r');
+            if (fid > 0)
+              fprintf('found via "Outpost.conf"!');
+              fcloseIfOpen(fid2);
+              break 
+            end
+          end % if (1 == findstrchr(lower(textLine), 'DataDir')
+        end % while (1 & ~feof(fid))
+        if (fid < 0)
+          fcloseIfOpen(fid2);
+        else
+          break % out of loop:  for listNdx = 1:length(fPathList)
+        end
+      end % if (fid > 0)
+    end % if (fid > 0) | netDrive else
   end % for listNdx = 1:length(fPathList)
   if (fid > 0) | netDrive
-    break
+    break % out of loop:  for driveNdx = 0:length(validDrives)
   end % if (fid > 0) | netDrive
 end % for driveNdx = 0:length(validDrives)
 
@@ -161,9 +186,13 @@ else
 end
 %-------  end function [netDrive, presentDrive] = lcl_getDrive(endWithBackSlash(thisDir));
 %-----------------------------------------------------------------
-function [netDrive, presentDrive, slashAt, fPath] = lcl_readPathOut(fpathName);
-netDrive = 0;
-presentDrive = '';
+function [netDrive, presentDrive, slashAt, fPath] = lcl_readPathOut(fpathName, netDrive, presentDrive);
+if nargin < 2
+  netDrive = 0;
+end
+if nargin < 3
+  presentDrive = '';
+end
 slashAt = 0;
 fPath = '';
 fid = fopen(fpathName, 'r');
@@ -173,6 +202,11 @@ if (fid > 0)
   fclose(fid);
   if length(textLine);
     textLine = endWithBackSlash(textLine);
+    if netDrive & length(presentDrive)
+      a = findstrchr(':', textLine);
+      b = findstrchr('\', presentDrive);
+      textLine = strcat(presentDrive(1:b(3)), textLine([1:a-1 a+1:length(textLine)]));
+    end % if netDrive & length(presentDrive)
     a = dir(strcat(textLine, 'outpost.ini'));
     if length(a)
       [netDrive, presentDrive, slashAt] = lcl_getDrive(textLine);

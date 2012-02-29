@@ -1,11 +1,6 @@
-function [err, errMsg, printEnable, copyList, numCopies, formField, h_field] = readPrintCnfg(receivedFlag, pathDirs, printEnable, formCoreName, fname)
+function [err, errMsg, formField, h_field, printed, printer] = readPrintCnfg(receivedFlag, pathDirs, printer, formCoreName, fname, outpostHdg)
 %when called with only 3 arguments (not passing formCoreName & fname) creates a Simple form
 %INPUT
-% receivedFlag: determines which configuration file is loaded.
-%  -1 sent message that was transcribed from paper 'outTrayPaper_copies.txt'
-%   0 sent message 'outTray_copies.txt'
-%   1 received message 'inTray_copies.txt'
-%   2 received message, simple & is delivery receipt 'inTray_DelvrRecp.txt'
 % if nargin >4, will open jpg for PacFORM... unless first character of <formCoreName.image> is -
 %   The - indicates jpg is not available and PacF will be opened in browser.
 % pathDirs.addOns
@@ -30,62 +25,31 @@ function [err, errMsg, printEnable, copyList, numCopies, formField, h_field] = r
 % formField(pageNumber, fieldIndex): structure
 % h_field(pageNumber, handleIndex): handles to the fields 1:1 correspondence between handleIndex & fieldIndex
 %     although handleIndex has one more entry: last non-zero entry on each page is figure's handle
+
+err = 0;
+errMsg  = '';
 h_field = 0;
 formField = '';
-
-[err, errMsg, printEnableRec, printEnableSent, printEnableDelvrRecp, ...
-    numCopies4recv, numCopies4sent, numCopies4sentFromPaper, numCopies4DelvrRecp, HPL3] = ...
-  readPrintICS_213INI(pathDirs.addOns, printEnable);
-
-switch receivedFlag
-case -1 %sent message that was transcribed from paper
-  numCopies = numCopies4sentFromPaper;
-  printEnable = printEnableSent;
-  [copyList, err, errMsg] = readRecipients(strcat(pathDirs.addOns,'outTrayPaper_copies.txt'));
-  a = 'Sent: ';
-case 0 %sent message 
-  numCopies = numCopies4sent;
-  printEnable = printEnableSent;
-  [copyList, err, errMsg] = readRecipients(strcat(pathDirs.addOns,'outTray_copies.txt'));
-  a = 'Sent: ';
-case 1 % received message
-  printEnable = printEnableRec;
-  numCopies = numCopies4recv;
-  [copyList, err, errMsg] = readRecipients(strcat(pathDirs.addOns,'inTray_copies.txt'));
-  a = 'Received: ';
-case 2 % received message, simple & is delivery receipt
-  numCopies = numCopies4DelvrRecp;
-  printEnable = printEnableDelvrRecp * (numCopies~=0);
-  [copyList, err, errMsg] = readRecipients(strcat(pathDirs.addOns,'inTray_DelvrRecp.txt'));
-  a = 'Received: ';
-otherwise
-  err = 1;
-  errMsg = sprintf('%s: internal error: unknown value for passed in received flag (%i)', mfilename, receivedFlag);
-  printEnable = 0;
-  copyList = {};
-  numCopies = -1;
-end % switch receivedFlag
-
-if err
-  errMsg = sprintf('>%s%s', mfilename, errMsg);
-  return
-end
-if printEnable
-  printEnable = printEnable * (length(copyList)>0);
-end
+printed.NamePath = ''; 
+printed.Name = '' ;
+printed.Date = '';
 
 % %%% might want to split here for printing initiated by operator for "this" form
 % hmm, but operator needs to call the specific form routine anyway and that's how we got here.
 % May want to pass more through that routing.
 
-if printEnable
-  fprintf('\n printEnable = %i', printEnable);
+if printer.printEnable
+  % % debug fprintf('\n printEnable = %i', printer.printEnable);
   if (nargin > 4)
+
     %patch for forms that cannot auto-print: bring 'em up in browser
     if strcmp('-', formCoreName.image(1:1))
-      [err, errMsg] = viewToPrintPACF(pathDirs.DirPF, pathDirs.addOnsPrgms, fname);
-      printEnable = 0;
+      [err, errMsg, h_field, formField, printed] = viewToPrintPACF(pathDirs, fname, printer, outpostHdg);
+      %disable the printing in any code here
+      printer.printEnable = 0;
+      %%%%%%%%%%%%%%%
       return
+      %%%%%%%%%%%%%%%
     end
     %formCoreName: --- multiple page forms not implemented for ICS213 because tyhat is a single page form
     %   core for .mat, the digitized fields: 
@@ -99,11 +63,11 @@ if printEnable
     %      single page form    <formCoreName>.jpg
     %      multiple page form  <formCoreName><_pg#>.jpg  where a separate .jpg exists for each page
     
-    if (printEnable > 1)
+    if (printer.printEnable > 1)
       calName = formCoreName.formAlign;
-    else % if (printEnable > 1)
+    else % if (printer.printEnable > 1)
       calName = formCoreName.printerAlign;
-    end % if (printEnable > 1) else
+    end % if (printer.printEnable > 1) else
 
     %load the form field positions and information
     if findstrchr('ics213', lower(calName))
@@ -147,8 +111,8 @@ if printEnable
               %if new is smaller
               for itemp = size(ff, 2)+1:size(formField, 2)
                 ff(itemp).digitizedName = '' ;
-                ff(pgNdx, itemp).PACFormTagPrimary = '' ;
-                ff(pgNdx, itemp).PACFormTagSecondary = '' ;
+                ff(itemp).PACFormTagPrimary = '' ;
+                ff(itemp).PACFormTagSecondary = '' ;
               end % for itemp = size(formField, 2)+1:size(ff, 2)
             end
             %include the load into the array
@@ -164,8 +128,8 @@ if printEnable
       fprintf('\n*** %s', errMsg);
       return
     end
-    
-    if (printEnable > 1)
+  
+    if (printer.printEnable > 1)
       %load each page: formField goes from a one dimension array and becomes two dimensioned (:) -> formField(:, pg)
       figPosition = 0 ;
       for pageNdx = 1:max(1,length(dirPgMat))
@@ -188,7 +152,11 @@ if printEnable
           [pathstr,name,ext,versn] = fileparts(fname);
           %%%%%% NOTE: exact wording of "page " is critical: expandBoxNForm.m needs to find this
           %  when inserting a page so renumbering will work.  %%%%%%%%%%%%
-          set(h_f(length(h_f)), 'Name', sprintf('%s%s page %i', name, ext, pageNdx));
+          if length(dirPgMat)
+            set(h_f(length(h_f)), 'Name', sprintf('%s%s page %i', name, ext, pageNdx));
+          else
+            set(h_f(length(h_f)), 'Name', sprintf('%s%s', name, ext));
+          end
           footerNdx = find( ismember({formField(pageNdx,:).digitizedName}, 'Footer') );
           if length(footerNdx)
             for itemp = 1:length(footerNdx)
@@ -221,9 +189,9 @@ if printEnable
           h_field(itemp, a) = h_fig(itemp);
         end
       end
-    end %if (printEnable > 1)
+    end %if (printer.printEnable > 1)
   else %if (nargin > 4)
-    if (printEnable > 1)
+    if (printer.printEnable > 1)
       %Simple message type
       [err, errMsg, h_field, formField] = showForm('', '', '');
       if err
@@ -232,7 +200,7 @@ if printEnable
       if (length(h_field) < 2) 
         fprintf('\n******* h_field short! Simple message ');
       end
-    end %if (printEnable > 1)
+    end %if (printer.printEnable > 1)
   end % if (nargin > 4) else
   %clear the .PACFormTagPrimary of every field that doesn't have a UI object/handles associated with it.
   %  Necessary to allow searches in filFormField to work:
@@ -243,5 +211,5 @@ if printEnable
   % %   %       formField(thisPage, invalidNdx(itemp)).PACFormTagPrimary = '';
   % %   %     end % for itemp = 1:length(invalidNdx)
   % %   %   end % for thisPage = 1:size(h_field,1)
-end % if printEnable
+end % if printer.printEnable
 

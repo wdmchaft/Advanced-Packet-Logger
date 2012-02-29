@@ -80,7 +80,7 @@ function [err, errMsg] = digitizePACF(pacfTxtDir);
 % f) finally after the fclose..., add where 'Planning' is the appropriate section
 %     addressee = 'Planning';
 %     if (~err & printEnable)
-%       [err, errMsg, printedNamePath, printedName] = formFooterPrint(printer, printEnable, copyList, numCopies, h_field, formField, msgFname, originator, addressee, textToPrint);
+%       [err, errMsg, printed] = formFooterPrint(printer, printEnable, copyList, numCopies, h_field, formField, msgFname, originator, addressee, textToPrint);
 %     end % if (~err & printEnable)
 %     
 
@@ -192,6 +192,7 @@ auxFile = sprintf('%s_%s.txt', mfilename, thisForm);
 fid_aux = fopen(auxFile, 'r');
 %we have a file?
 if fid_aux > 0
+  fprintf('\n*** Form-specific "rules" file located...');
   fieldKey = {};
   while ~feof(fid_aux)
     textLine = fgetl(fid_aux);
@@ -200,10 +201,12 @@ if fid_aux > 0
       commasAt = findstrchr(',', textLine);
       [err, errMsg, text] = extractTextFromCSVText(textLine, commasAt, 0);
       fieldKey(length(fieldKey)+1) = {lower(strtrim(text))};
+      fprintf('\n  for field named "%s", added checkboxes for ', strtrim(text));
       %extract the information from the line
       for itemp = 1:length(commasAt)
         [err, errMsg, text] = extractTextFromCSVText(textLine, commasAt, itemp );
         txt(length(txt) + 1) = {lower(strtrim(text))};
+        fprintf('%s, ', strtrim(text));
       end % for itemp = 1:length(commasAt)
       %add to the rules list.
       checkBoxContents{size(checkBoxContents,1)+1,:} = txt ;
@@ -234,7 +237,8 @@ while 1 % read & detect the field for each line of the entire message
   end
   [fieldText, fieldID] = extractPACFormField(textLine) ;
   a = findstrchr('.', fieldID);
-  if a
+  % . is not embedded  ex: A. & not A.0
+  if (a(length(a)) == length(fieldID))
     fieldIDNoPeriod = fieldID(1:a-1);
   else
     fieldIDNoPeriod = fieldID;
